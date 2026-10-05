@@ -9,6 +9,7 @@ import { githubRoutes } from './github.js';
 import { pageRoutes } from './pages.js';
 import { searchRoutes } from './search.js';
 import { serviceRoutes } from './services.js';
+import { tvwallRoutes } from './tvwall.js';
 
 export const routes: readonly Route[] = [
   // Anyone.
@@ -29,6 +30,7 @@ export const routes: readonly Route[] = [
   authRoutes.whoami,
   agentRoutes.models,
   fileRoutes.image,
+  tvwallRoutes.feed,
   fileRoutes.whiteboardFile,
   fileRoutes.termDrop,
   fileRoutes.changedFile,

@@ -1,0 +1,25 @@
+/* The TV wall: its window, the viewer, and the layer of frames behind the 3D view (see css3d.ts). */
+
+/* Behind the canvas, which is see-through only where a screen's glass is. Nothing in it takes the mouse. */
+.tv-frames { position: absolute !important; inset: 0; pointer-events: none; z-index: 0; }
+.tv-frames ~ #scene { z-index: 1; }
+.tv-frame { background: #000; }
+.tv-frame iframe { width: 100%; height: 100%; border: 0; display: block; background: #000; }
+
+.modal.tvwall { width: min(620px, 100%); }
+.tv-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.tv-tab { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; font: inherit; text-align: left; cursor: pointer; border: 3px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); }
+.tv-tab.on { background: var(--ink); color: var(--paper); }
+.tv-tab-n { font-size: 11px; font-weight: 900; letter-spacing: .08em; opacity: .7; }
+.tv-tab-what { font-size: 14px; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.tv-kind { font: inherit; font-size: 13px; font-weight: 800; padding: 5px 10px; cursor: pointer; border: 2px solid var(--ink); border-radius: 999px; background: #fff; color: var(--ink); }
+.tv-kind.on { background: var(--accent); color: var(--accent-ink); }
+.tv-what select { width: 100%; font: inherit; font-size: 15px; border: 3px solid var(--ink); border-radius: 12px; padding: 9px 10px; background: #fff; }
+.tv-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tv-presets:empty { display: none; }
+.tv-preset { padding: 3px 10px; font-size: 12px; }
+
+.modal.tv-viewer { width: min(1280px, calc(100vw - 32px), calc((100vh - 120px) * 16 / 9)); }
+.tv-viewer-body { aspect-ratio: 16 / 9; background: #000; }
+.tv-viewer-body iframe { width: 100%; height: 100%; border: 0; display: block; }

@@ -20,6 +20,7 @@ import { Court } from './court.js';
 import { Jail } from './jail.js';
 import { Garage } from './garage.js';
 import { Jukebox } from './jukebox.js';
+import { TvWall } from './tvwall.js';
 import { Whiteboard } from './whiteboard.js';
 import { MeetingRoom } from './meetings.js';
 import { Worktrees, type WorktreeCleanup } from './worktrees.js';
@@ -120,6 +121,8 @@ export class Floor {
   /** The signs over its desks, and how far its back office is built out. */
   readonly plan: FloorPlanStore;
   readonly jukebox: Jukebox;
+  /** The screens up over the boards (see shared/tvwall.ts). */
+  readonly tvwall: TvWall;
   /** The whiteboard everyone on the floor draws on together. */
   readonly whiteboard: Whiteboard;
   /** The meeting room, where workers work through a question together (see meetings.ts). */
@@ -307,6 +310,7 @@ export class Floor {
 
     this.decor = new Decor(dataDir);
     this.jukebox = new Jukebox(dataDir);
+    this.tvwall = new TvWall(dataDir);
     this.whiteboard = new Whiteboard(dataDir);
     this.ready = this.workers.start();
 
