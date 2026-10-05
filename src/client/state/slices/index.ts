@@ -28,6 +28,7 @@ import { services } from './services';
 import { signins } from './signins';
 import { sky } from './sky';
 import { team } from './team';
+import { tvwall } from './tvwall';
 import { theme } from './theme';
 import { upgrade } from './upgrade';
 import { usage } from './usage';
@@ -53,6 +54,7 @@ export const SLICES: readonly Slice[] = [
   services,
   dog,
   jukebox,
+  tvwall,
   whiteboard,
   cabinet,
   ball,

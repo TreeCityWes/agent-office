@@ -37,7 +37,11 @@ export interface Stage {
 
 export function makeRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer | null {
   try {
-    return new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // With alpha, so a TV wall screen can be see-through onto the frame behind the canvas (see features/tvwall).
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+    // Everywhere else stays as solid as it always was.
+    renderer.setClearAlpha(1);
+    return renderer;
   } catch (err) {
     console.error(err);
     return null;
