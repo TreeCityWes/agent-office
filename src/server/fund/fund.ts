@@ -10,6 +10,7 @@ import { checkConfig, type FundState } from '../../shared/fund/state.js';
 import type { ActivityEvent, Actor, Asset, NavMarks, PortfolioView, PostTradeReview, Proposal, ProposalStage, RiskVerdict, Side } from '../../shared/fund/types.js';
 import { MarketData, type MarketOptions } from './market/index.js';
 import { ActivityLog, Ledger, NavHistory, ProposalRecords } from './records.js';
+import { Desks, type FundOffice } from './desks.js';
 import { closePosition as runClose, exitProposal as runExit } from './exits.js';
 import { PaperVenue, type ExecutionVenue } from './venue.js';
 
@@ -22,7 +23,9 @@ export interface FundOptions {
   /** Stand-ins for the market data sources (tests). */
   marketAdapters?: MarketOptions['adapters'];
   now?: () => number;
-  /** Whether a CIO or PM is at a desk to rule on proposals before a person does. */
+  /** The workers holding the fund's roles, and the office they sit in (office.ts). */
+  office?: FundOffice;
+  /** Whether a CIO or PM is at a desk to rule on proposals before a person does; by default, whether one holds a desk. */
   hasRuler?: () => boolean;
   /** Something the dashboards show changed (at most every 250 ms). */
   onChange?: () => void;
@@ -37,9 +40,6 @@ const WATCHED: readonly ProposalStage[] = ['proposed', 'risk_review', 'cio_revie
 const WAITING: readonly ProposalStage[] = ['idea', 'research', 'cio_review', 'user_approval'];
 const FINISHED_SHOWN = 30;
 
-/** Who someone is, in a log line: "Ada (Macro Analyst)". */
-export const who = (a: Actor) => (a.role && ROLE_BY_ID.get(a.role) ? `${a.name} (${ROLE_BY_ID.get(a.role)!.title})` : a.name);
-
 /**
  * The fund: its paper book, its proposals and their way through risk and approval to a fill, the
  * market data everyone reads, and the activity log (see docs/fund.md). One per building. Agents and
@@ -52,6 +52,7 @@ export class Fund {
   proposals!: ProposalRecords;
   nav!: NavHistory;
   activity!: ActivityLog;
+  desks!: Desks;
   readonly market: MarketData;
   readonly venue: ExecutionVenue;
   readonly now: () => number;
@@ -74,7 +75,15 @@ export class Fund {
     this.ledger = new Ledger(this.opts.dir, this.now());
     this.proposals = new ProposalRecords(this.opts.dir);
     this.nav = new NavHistory(this.opts.dir);
-    this.activity = new ActivityLog(this.opts.dir, (e) => this.opts.onActivity?.(e));
+    // The desks staffed carry on into a fund started over; their memory stays with the old one.
+    const staffed = this.desks?.snapshot() ?? [];
+    this.desks?.stop();
+    this.desks = new Desks(this, this.opts.dir, this.opts.office);
+    this.desks.adopt(staffed);
+    this.activity = new ActivityLog(this.opts.dir, (e) => {
+      this.opts.onActivity?.(e);
+      this.desks.heard(e);
+    });
     this.marks = this.nav.marks;
     this.recover();
   }
@@ -100,6 +109,7 @@ export class Fund {
 
   stop() {
     this.market.stop();
+    this.desks.stop();
     clearInterval(this.timer);
     clearTimeout(this.changeTimer);
   }
@@ -145,6 +155,7 @@ export class Fund {
       proposals: [...live, ...done],
       market: this.market.state(),
       nav: this.nav.points.slice(-500),
+      desks: this.desks.state(),
       ...(halted ? { halted } : {}),
       notes: [this.ledger, this.proposals, this.nav, this.activity].flatMap((r) => (r.repaired ? [r.repaired] : [])),
     };
@@ -279,7 +290,7 @@ export class Fund {
     const said = v.decision === 'approved' ? `approved at ${usd(v.approvedUsd)}` : v.decision === 'resized' ? `resized to ${usd(v.approvedUsd)}` : 'rejected';
     this.log('risk', RISK, `${p.id} ${said}${v.reasons.length ? `: ${v.reasons.join('; ')}` : ''}`, { proposalId: p.id, symbol: p.symbol, level: v.decision === 'approved' ? 'good' : v.decision === 'resized' ? 'warn' : 'bad' });
     if (v.decision === 'rejected') return this.move(p, 'rejected', RISK, v.reasons.join('; '));
-    if (this.ledger.config.requireCio && this.opts.hasRuler?.()) return this.move(p, 'cio_review', RISK);
+    if (this.ledger.config.requireCio && (this.opts.hasRuler ? this.opts.hasRuler() : this.desks.hasRuler(p.author.id))) return this.move(p, 'cio_review', RISK);
     return this.move(p, 'user_approval', RISK);
   }
 
@@ -382,6 +393,7 @@ export class Fund {
       const found = this.find(id);
       if ('error' in found) return found;
       if (found.stage !== 'exited') return { error: `${found.id} is ${STAGE_LABEL[found.stage]}: a trade is reviewed once it's exited` };
+      if (by.kind === 'agent' && by.id !== found.author.id && (!by.role || by.role !== found.author.role) && !this.can(by, 'rule')) return { error: `${found.id} is for its author's desk to review` };
       if (typeof raw.thesisHeld !== 'boolean') return { error: 'thesisHeld: did the thesis play out, true or false?' };
       const lessons = typeof raw.lessons === 'string' ? raw.lessons.trim().slice(0, 2000) : '';
       if (lessons.length < 10) return { error: 'lessons: what it taught, in a sentence or more' };

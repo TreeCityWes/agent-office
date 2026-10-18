@@ -4,12 +4,13 @@
 // telling one something and saying which pull request is one's. The office puts it on every worker's PATH and gives each its own address and
 // token in AGENT_OFFICE_HOOK_URL, AGENT_OFFICE_WORKER_ID and AGENT_OFFICE_HOOK_TOKEN; this talks to
 // the /office/workers endpoint with them (src/server/office-workers.ts). `office-workers mcp` is the
-// same as an MCP server on stdio, which the office hands the agents that take one. Plain Node, no
-// build step, no dependencies.
+// same as an MCP server on stdio, which the office hands the agents that take one; to a worker holding
+// a desk at the fund it serves the fund's tools too (office-fund.js). Plain Node, no build step, no dependencies.
 
 import { realpathSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { FUND_INSTRUCTIONS, fundToolsFor, isFundTool, runFundTool } from './office-fund.js';
 
 const USAGE = `Usage:
   office-workers list [--json]                  everyone at a desk on this floor: status, task,
@@ -180,7 +181,7 @@ export function refusal(status, body) {
 }
 
 /** Sends the request, retrying for a few seconds while nothing's listening (the office restarting). */
-async function send(req, fetchImpl) {
+export async function send(req, fetchImpl) {
   const until = Date.now() + RETRY_MS;
   for (;;) {
     try {
@@ -408,18 +409,19 @@ export async function handleMcp(msg, io) {
         protocolVersion: MCP_VERSIONS.includes(asked) ? asked : MCP_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: 'agent-office', title: 'Agent Office', version: '1.0.0' },
-        instructions: INSTRUCTIONS,
+        instructions: INSTRUCTIONS + FUND_INSTRUCTIONS,
       });
     }
     case 'ping':
       return ok({});
     case 'tools/list':
-      return ok({ tools: TOOLS });
+      // The fund's, for a worker holding one of its desks: only what its role may use.
+      return ok({ tools: [...TOOLS, ...(await fundToolsFor(io))] });
     case 'tools/call': {
       const name = msg.params?.name;
-      if (!TOOLS.some((t) => t.name === name)) return { jsonrpc: '2.0', id: msg.id, error: { code: -32602, message: `Unknown tool: ${name}` } };
+      if (!TOOLS.some((t) => t.name === name) && !isFundTool(name)) return { jsonrpc: '2.0', id: msg.id, error: { code: -32602, message: `Unknown tool: ${name}` } };
       try {
-        const { text, isError } = await runTool(name, msg.params?.arguments, io);
+        const { text, isError } = await (isFundTool(name) ? runFundTool : runTool)(name, msg.params?.arguments, io);
         return ok({ content: [{ type: 'text', text }], ...(isError ? { isError: true } : {}) });
       } catch (e) {
         return ok({ content: [{ type: 'text', text: e.message }], isError: true });

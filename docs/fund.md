@@ -61,9 +61,9 @@ Every desk agent is a worker (a real session) with a **role** from the catalog i
 | 🧪 Quant lab | Quant Researcher, Strategy Researcher, Backtester, Factor Analyst, Data Scientist |
 | 🛡️ Risk | Portfolio Risk, Market Risk, Liquidity Risk, Trade Auditor, Compliance |
 
-A role has a brief (what the agent is for and what it produces), a focus, and **permissions**: which fund tools it may call. Only the CIO and PM endorse proposals; only the CIO calls the committee; risk agents explain the risk engine's verdicts but can't override them; nobody's tools reach the risk limits or the books.
+A role has a brief (what the agent is for and what it produces), a focus, and **permissions**: which fund tools it may call. Most roles propose trades. The Skeptic, the Execution Trader, the Backtester, the Data Scientist and the risk desks don't: they read, watch, write down what they see and message the desks that do. Only the CIO and PM rule on proposals; the CIO, PM and Chief Risk Officer hand out work; risk agents explain the risk engine's verdicts but can't override them; nobody's tools reach the risk limits or the books.
 
-Each staffed role has a **desk profile** (`DeskProfile`): role, department, the fund status the agent reports (`idle`, `researching`, `analyzing`, `backtesting`, `proposing`, `waiting`, `blocked`, `monitoring`, `finished`), its current assignment, thesis and confidence. That sits beside the worker's process status (`working`, `needs_input`…), which the office already knows from hooks.
+Each staffed role has a **desk profile** (`DeskProfile`): role, department, the fund status the agent reports (`idle`, `researching`, `analyzing`, `backtesting`, `proposing`, `waiting`, `blocked`, `monitoring`, `finished`), its current assignment, thesis and confidence, and its track record (what it proposed, what filled, wins and losses, realized P&L). That sits beside the worker's process status (`working`, `needs_input`…), which the office already knows from hooks.
 
 ### Memory
 
@@ -77,7 +77,7 @@ agents/macro/
   decisions.jsonl       its recommendations and proposals, and how they turned out
 ```
 
-Agents add to them through tools (`fund_thesis`, `fund_observe`), not by editing the files, so every entry is stamped and attributed. They read them freely.
+Agents add to them through tools (`fund_thesis`, `fund_observe`), not by editing the files, so every entry is stamped and attributed. They read them freely, or through `fund_memory`. Decisions are written by the office: each proposal a desk makes, withdraws, rules on or reviews. The messages between desks are one more journal beside them, `messages.jsonl`, and who holds which desk is `desks.json`.
 
 ### Portfolio
 
@@ -142,20 +142,57 @@ The chain makes tampering evident, not impossible: the agents run as the same us
 
 ## The 💼 Fund window
 
-**☰ → 💼 Fund** opens the fund over the office, as a trading terminal. Along the top: the NAV, the day's P&L, the total return, the drawdown, the leverage, and whether prices are coming in (**LIVE DATA**, **DATA IDLE** or **MOCK DATA**). Badges say what you're looking at: **PAPER** always, **MOCK MARKET** on simulated prices, **HALTED** when a journal didn't check out. Keys **1**–**6** turn to a tab:
+**☰ → 💼 Fund** opens the fund over the office, as a trading terminal. Along the top: the NAV, the day's P&L, the total return, the drawdown, the leverage, and whether prices are coming in (**LIVE DATA**, **DATA IDLE** or **MOCK DATA**). Badges say what you're looking at: **PAPER** always, **MOCK MARKET** on simulated prices, **HALTED** when a journal didn't check out. Keys **1**–**7** turn to a tab:
 
 | Tab | What's on it |
 | --- | --- |
 | Overview | NAV, the day's and total P&L, cash, gross and net exposure, leverage and drawdown against their limits, fees paid; the NAV over time; the positions, with what each is up or down; exposure by asset class |
+| Agents | Every role by department, staffed or vacant. A staffed desk shows its agent, what its process is doing and the status it reports, its assignment, thesis and confidence, and its record; **Memory** opens its thesis history, observations and decisions. Staff a vacant desk with an agent already at work or a new hire; **Hire** on the team bar staffs whichever of the core team (the CIO, the Macro and Crypto Analysts, the Quant Researcher and the Skeptic) is missing, in one go. Assign a task, send a message or release a desk. Underneath, the messages between the desks |
 | Proposals | Waiting on your approval, with the CIO, open trades, ideas and research, finished. Each shows its thesis, catalyst, evidence and dissent, every risk check with its numbers, the CIO's and the person's rulings, its fill, its exit and review, and its history. Approve or reject it with a note for the record, or exit an open trade now. **Propose a trade yourself** goes through the same risk engine as an agent's |
 | Risk | The book against each limit, exposure by correlation group, and the limits themselves, to change |
 | Market | Every price with its source and age (**MOCK** marked, a price too old to trade on in red), the latest signals, and how each source is doing |
-| Activity | The fund's own log, by kind: every proposal, verdict, ruling, fill, exit, limit change and review, with who did it |
+| Activity | The fund's own log, by kind: every proposal, verdict, ruling, fill, exit, limit change and review, and every thesis, observation, status, assignment, message and escalation from the desks, with who did it |
 | Settings | The fund's name, fee and slippage, its market data (public or mock), whether a CIO or PM rules first, how long a proposal waits; paying capital in or taking it out; starting over |
 
-Anyone in the office can watch. Only admins act: approve, reject, exit, close, propose, change the limits or settings, move capital or start over. The office checks that itself, not the window (everyone on the shared password is an admin; with [accounts](../README.md#add-users), a Member only watches). When a trade waits on a person, or the fund has halted, a 💼 chip on the top bar says so to everyone in the building, with how many.
+Anyone in the office can watch. Only admins act: approve, reject, exit, close, propose, staff and release desks, assign and message them, change the limits or settings, move capital or start over. The office checks that itself, not the window (everyone on the shared password is an admin; with [accounts](../README.md#add-users), a Member only watches). When a trade waits on a person, or the fund has halted, a 💼 chip on the top bar says so to everyone in the building, with how many.
 
 The window only watches while it's open: it keeps prices coming while you look, and lets go when you close it (**✕** or **Esc**, straight back to looking around).
+
+## Agents at the desks
+
+A desk is staffed by a real worker: an agent already at work in the office, or one hired for the role from the window's Agents tab. Each role is held by one worker at a time. Taking a role does three things:
+
+- **The brief.** The agent is told who it is: the role's brief, its permissions, where its memory is, and to start by reading that memory and reporting its status. A new hire starts with it as its first prompt; an agent already at work gets it typed in.
+- **The sign.** The role's sign (`🔎 Macro Analyst`) goes up over its desk, in its department's colour, and comes down when it's released. A new hire for a role takes the desk with the role's sign when it's free.
+- **The tools.** Its `agent-office` MCP server lists the fund's tools its role allows (below). A worker without a role sees none of them, so coding agents' tool lists stay as they were.
+
+When a worker goes home its desk is free again; the role's memory stays, and the next holder starts from the last thesis. The desks carry on when the fund is started over.
+
+The office keeps the desks talking without anyone relaying:
+
+- A message or an assignment is typed into the agent it's for, with who it's from and how to answer. Assignments come from the CIO, PM and CRO (or a person), and become the desk's current assignment.
+- An escalation is a toast to everyone in the building and a message to the CIO.
+- An agent hears what happened to its proposal: the risk verdict, a ruling, a fill, an exit, and when to write its review. When a proposal waits on the CIO, the CIO (or the PM, when the CIO wrote it) is told to rule on it. Nobody rules on their own proposal: a CIO's goes straight to a person.
+
+Every one of these goes in the activity log, with who did it.
+
+### The fund tools
+
+What an agent at a desk can call, from its `agent-office` MCP server, or from the `office-fund` command on its PATH when its tools were listed before it took the desk (`office-fund help`, `office-fund portfolio`, `office-fund propose '{"symbol":"BTC",…}'`). Both go to `/fund/*` on the office's loopback hook server with the worker's own token, so the fund knows which worker called and what its role allows:
+
+| Tool | Who | What it does |
+| --- | --- | --- |
+| `fund_portfolio`, `fund_quotes`, `fund_market` | anyone | the paper book, prices with their source and age, the market's signals |
+| `fund_proposals`, `fund_activity`, `fund_desks`, `fund_memory` | anyone | proposals by stage or one in full, the log, who holds which desk, a role's memory |
+| `fund_risk_check` | anyone | what the risk engine would say to a trade, without proposing it |
+| `fund_status`, `fund_thesis`, `fund_observe` | a desk | report its status, change its thesis and confidence, write down what it saw |
+| `fund_message`, `fund_inbox`, `fund_escalate` | a desk | message another desk, read what came in, escalate to the CIO and the room |
+| `fund_review` | a desk | the post-trade review of its own exited trade |
+| `fund_propose`, `fund_withdraw` | roles that propose | propose a trade or an idea (or fill an idea in), withdraw its own |
+| `fund_rule` | CIO, PM | back or reject a proposal at CIO review |
+| `fund_assign` | CIO, PM, CRO | hand a desk a task |
+
+None of them approves a trade, changes a limit or touches the books: a person approves, and approving runs risk again.
 
 ## The plan
 
@@ -165,9 +202,11 @@ Each step is a pull request that leaves the office working.
 
 1. **Fund core** — this page; the pure domain (`shared/fund/`); the records, paper venue, exits, market data and the `Fund` service (`server/fund/`), as `ctx.fund`; tests. Nothing visible yet, and nothing on disk or on the network until it's used.
 2. **Dashboards** ✅ — the fund's messages (`shared/protocol/fund.ts`) and their handlers (`server/ws/handlers/fund.ts`, where the admin check lives), the state slice, and [the 💼 Fund window](#the--fund-window) with its chip on the top bar.
-3. **Agents at the desks** — staffing a role (brief, permissions, memory folder), the fund's MCP tools (portfolio, quotes, proposals, messages, thesis and observations, status, escalate), the desk profile on the worker's card, and an Agents tab in the window.
-4. **The trading floor** — the map: desks grouped by department with their signs, ticker walls and portfolio and risk screens, the CIO's office, the committee room, and a risk event you can see from across the floor.
+3. **Agents at the desks** ✅ — [staffing a role](#agents-at-the-desks) (brief, permissions, memory folder, the sign over its desk), [the fund's tools](#the-fund-tools) on the agents' MCP server and the `office-fund` command, messages, assignments and escalations between the desks, the desk profiles, and the Agents tab.
+4. **The investment committee** — the CIO or PM calls a meeting on a proposal; each seat casts BUY / HOLD / SELL with its confidence, argument, evidence and risk; the Skeptic always sits; the CIO sums it up.
+5. **Strategies and backtests** — the strategy registry (idea → research → backtest → validation → paper → approved → retired), a backtest service (Sharpe, drawdown, win rate, profit factor, turnover), and their tabs.
+6. **The trading floor** — the map: desks grouped by department with their signs, ticker walls and portfolio and risk screens, the CIO's office, the committee room, and a risk event you can see from across the floor.
 
-**Phase 2**: agent-to-agent tasking and inboxes, the investment committee (BUY / HOLD / SELL ballots, the Skeptic, the CIO's summary), memory views (thesis history, confidence over time, track record), the backtest service and strategy registry (idea → research → backtest → validation → paper → approved → retired, with Sharpe, drawdown, win rate, profit factor, turnover), and performance scores.
+**Phase 2**: confidence over time and performance scores per desk, research requests that track their answers, and agents that pick work up on a schedule.
 
 **Phase 3**: richer data (news, on-chain, filings, macro, ETF flows), broker adapters, more of the office acting out the fund, and live execution behind strict approvals, if ever.

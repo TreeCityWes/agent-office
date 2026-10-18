@@ -1,4 +1,5 @@
 import type { FundBrief } from '../../../shared/protocol';
+import type { DeskMemory } from '../../../shared/fund/desks';
 import type { FundState } from '../../../shared/fund/state';
 import type { ActivityEvent } from '../../../shared/fund/types';
 import type { Slice } from '../store';
@@ -11,11 +12,14 @@ declare module '../store' {
     fund: FundState | null;
     /** Its activity log, newest first, while the window is open. */
     fundActivity: ActivityEvent[];
+    /** The role memory asked for last, from the Agents tab. */
+    fundMemory: DeskMemory | null;
   }
   interface Topics {
     fundBrief: true;
     fund: true;
     fundActivity: true;
+    fundMemory: true;
   }
 }
 
@@ -28,6 +32,7 @@ export const fund: Slice = {
     s.fundBrief = { awaiting: 0, open: 0, halted: false };
     s.fund = null;
     s.fundActivity = [];
+    s.fundMemory = null;
   },
   on: {
     'fund.brief'(s, m) {
@@ -42,6 +47,10 @@ export const fund: Slice = {
       const latest = [...m.events].reverse();
       s.fundActivity = (m.all ? latest : [...latest, ...s.fundActivity]).slice(0, KEEP);
       return ['fundActivity'];
+    },
+    'fund.memory'(s, m) {
+      s.fundMemory = m.memory;
+      return ['fundMemory'];
     },
   },
 };

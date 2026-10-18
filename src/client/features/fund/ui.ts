@@ -1,12 +1,13 @@
 // The 💼 Fund window: a trading terminal over the office. A ticker along the top (NAV, the day, the
-// drawdown, the market data), then a tab each for the overview, proposals, risk, market, activity and
-// settings. It watches the fund while it's open and lets go when it closes.
+// drawdown, the market data), then a tab each for the overview, the agents at the desks, proposals, risk,
+// market, activity and settings. It watches the fund while it's open and lets go when it closes.
 import './ui.css';
 import type { ClientMsg } from '../../../shared/protocol';
 import { pct, usd } from '../../../shared/fund/format';
 import { store } from '../../state';
 import { h, openModal, type Modal } from '../../ui/dom';
 import { activityTab } from './activity';
+import { agentsTab } from './agents';
 import { marketTab } from './market';
 import { overviewTab } from './overview';
 import { proposalsTab } from './proposals';
@@ -39,6 +40,7 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
   const made = new Map<TabId, FundTab>();
   const makers: Record<TabId, () => FundTab> = {
     overview: () => overviewTab(deps),
+    agents: () => agentsTab(deps),
     proposals: () => proposalsTab(deps),
     risk: () => riskTab(deps),
     market: () => marketTab(),
@@ -83,6 +85,10 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
     const awaiting = s.proposals.filter((x) => x.stage === 'user_approval').length;
     const count = tabBar.querySelector<HTMLElement>('[data-tab="proposals"] .fd-count');
     if (count) count.textContent = awaiting ? String(awaiting) : '';
+    // Desks whose agent is waiting on a person (a question, a permission).
+    const asking = s.desks.desks.filter((d) => d.process === 'needs_input').length;
+    const deskCount = tabBar.querySelector<HTMLElement>('[data-tab="agents"] .fd-count');
+    if (deskCount) deskCount.textContent = asking ? String(asking) : '';
 
     let tab = made.get(current);
     if (!tab) {
@@ -95,7 +101,7 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
     tab.update(s, store.fundActivity);
   }
 
-  // 1–6 turn to a tab, unless you're typing.
+  // 1–7 turn to a tab, unless you're typing.
   const onKey = (e: KeyboardEvent) => {
     const t = e.target as HTMLElement | null;
     if (e.ctrlKey || e.metaKey || e.altKey || (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;

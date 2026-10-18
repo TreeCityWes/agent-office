@@ -1,5 +1,5 @@
 // The loopback-only server for the workers' own calls: their agents' hook events, and the office's
-// queue and workers for the board agents and the office-workers command.
+// queue and workers for the board agents and the office-workers command, and the fund's tools for its desks.
 import http from 'node:http';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -7,6 +7,7 @@ import type { Ctx } from '../office/context.js';
 import { readBody, send } from '../http/util.js';
 import { officeQueue } from './office-queue.js';
 import { officeWorkers } from './office-workers.js';
+import { fundTools } from './fund.js';
 import { providerHook } from '../providers/index.js';
 import type { AgentProvider } from '../../shared/providers.js';
 
@@ -21,6 +22,7 @@ export async function startHookServer(ctx: Ctx): Promise<{ hookServer: http.Serv
     }
     if (url.pathname === '/office/queue') return officeQueue(ctx, req, res, url);
     if (url.pathname === '/office/workers' || url.pathname.startsWith('/office/workers/')) return officeWorkers(ctx, req, res, url);
+    if (url.pathname.startsWith('/fund/')) return fundTools(ctx, req, res, url);
     // Each provider with hooks has its route, /hooks/<provider> (see providers/).
     const route = url.pathname.startsWith('/hooks/') ? url.pathname.slice('/hooks/'.length) : '';
     const hook = providerHook(route);
