@@ -1,8 +1,9 @@
 // The 💼 Fund window's Research tab (docs/fund.md#research): what the desks are working on now, every
 // desk's thesis and how its confidence moved, which assets the fund covers and how closely, the ideas
 // still being filled in, the notes the desks post, and how their calls did against the confidence they
-// gave. An admin can ask any desk to look into something. It's read from the desks' memory on disk, so
-// it's asked for (fund.research) when the tab opens and again when a desk writes, not sent with the fund.
+// gave. An admin can ask any desk to look into something, tracked with the desks' own requests until it's
+// answered (requests.ts). It's read from the desks' memory on disk, so it's asked for (fund.research) when
+// the tab opens and again when a desk writes, not sent with the fund.
 import './research.css';
 import { price } from '../../../shared/fund/format';
 import { STAGE_LABEL } from '../../../shared/fund/proposals';
@@ -13,6 +14,7 @@ import type { ActivityEvent, ActivityKind } from '../../../shared/fund/types';
 import { store } from '../../state';
 import { h, timeAgo } from '../../ui/dom';
 import { deskTitle } from './pnl';
+import { requestsSection } from './requests';
 import { change, money, section, table, type FundTab, type TabDeps } from './view';
 
 /** What a desk writing changes here: a new note or thesis, or a trade closing and being reviewed. */
@@ -89,10 +91,12 @@ export function researchTab(deps: TabDeps): FundTab {
   const notes = h('ol.fd-rs-notes');
   const calib = h('div');
   const calls = h('div');
+  const reqs = requestsSection(deps);
   const el = h(
     'div.fd-tab',
     {},
     ask,
+    reqs.el,
     section('On the desks now', working),
     section('Theses', theses),
     section('Coverage by asset', cover),
@@ -124,15 +128,16 @@ export function researchTab(deps: TabDeps): FundTab {
     deps.send({ t: 'fund.research' });
   }
 
-  // The request form, made once: a desk, an asset if it's about one, and the question.
+  // The request form, made once: a desk, an asset if it's about one, the question, and by when.
   const desk = h('select.fd-input', { 'aria-label': 'Which desk' }) as HTMLSelectElement;
+  const due = h('select.fd-input', { 'aria-label': 'By when' }, ...[['', 'No deadline'], ['30', 'Within 30 min'], ['60', 'Within an hour'], ['240', 'Within 4 h'], ['1440', 'Within a day']].map(([v, l]) => h('option', { value: v }, l))) as HTMLSelectElement;
   const sym = h('input.fd-input', { placeholder: 'BTC, SPY… (optional)', maxlength: '16', 'aria-label': 'Asset' }) as HTMLInputElement;
   const question = h('input.fd-input', { placeholder: 'What should it find out?', maxlength: '1000', 'aria-label': 'Question' }) as HTMLInputElement;
   const send = () => {
     const q = question.value.trim();
     if (!q || !desk.value) return question.focus();
     const on = sym.value.trim().toUpperCase();
-    deps.send({ t: 'fund.assign', role: desk.value, text: `Research request${on ? ` on ${on}` : ''}: ${q}` });
+    deps.send({ t: 'fund.request', request: { to: desk.value, question: q, ...(on ? { symbol: on } : {}), ...(due.value ? { dueInMin: Number(due.value) } : {}) } });
     question.value = '';
   };
   question.addEventListener('keydown', (e) => {
@@ -140,8 +145,8 @@ export function researchTab(deps: TabDeps): FundTab {
   });
   const form = section(
     'Ask a desk to research',
-    h('div.fd-rs-ask', {}, desk, sym, question, h('button.fd-btn.go', { type: 'button', onclick: send }, 'Ask')),
-    h('div.fd-hint', {}, 'It goes to the desk as an assignment, typed into its agent; what it finds comes back here as notes and a thesis.'),
+    h('div.fd-rs-ask', {}, desk, sym, question, due, h('button.fd-btn.go', { type: 'button', onclick: send }, 'Ask')),
+    h('div.fd-hint', {}, 'It’s typed into the desk’s agent and stays open below until the desk answers with fund_answer; a vacant desk is told when someone takes it.'),
   );
 
   function drawDesks(s: FundState) {
@@ -150,10 +155,10 @@ export function researchTab(deps: TabDeps): FundTab {
       const keep = desk.value;
       desk.replaceChildren(
         ...(Object.entries(DEPARTMENTS) as [Department, (typeof DEPARTMENTS)[Department]][]).map(([id, d]) =>
-          h('optgroup', { label: `${d.icon} ${d.label}` }, ...ROLES.filter((r) => r.department === id).map((r) => h('option', { value: r.id, disabled: !held.has(r.id) }, held.has(r.id) ? `${r.title} · ${held.get(r.id)!.name}` : `${r.title} (vacant)`))),
+          h('optgroup', { label: `${d.icon} ${d.label}` }, ...ROLES.filter((r) => r.department === id).map((r) => h('option', { value: r.id }, held.has(r.id) ? `${r.title} · ${held.get(r.id)!.name}` : `${r.title} (vacant)`))),
         ),
       );
-      desk.value = keep && held.has(keep) ? keep : (ROLES.find((r) => held.has(r.id) && r.department === 'research')?.id ?? ROLES.find((r) => held.has(r.id))?.id ?? '');
+      desk.value = keep || (ROLES.find((r) => held.has(r.id) && r.department === 'research')?.id ?? ROLES.find((r) => held.has(r.id))?.id ?? 'macro');
       ask.replaceChildren(store.me.admin ? form : '');
     });
     const rows = s.desks.desks.map((d) => ({ role: d.role, name: d.name, status: d.status, process: d.process, note: d.note, assignment: d.assignment?.text }));
@@ -284,6 +289,7 @@ export function researchTab(deps: TabDeps): FundTab {
     update(s: FundState, activity: readonly ActivityEvent[]) {
       last = s;
       drawDesks(s);
+      reqs.update(s);
       drawIdeas(s);
       drawResearch();
       // Ask again when a desk wrote something, a few seconds apart at most, and at least once a minute.

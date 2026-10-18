@@ -130,7 +130,7 @@ export class Fund {
 
   /** Why the fund isn't trading, when one of its journals doesn't check out. */
   halted(): string | undefined {
-    for (const [name, r] of [['ledger', this.ledger], ['proposals', this.proposals], ['NAV', this.nav], ['activity', this.activity], ['committees', this.committees], ['strategies', this.strategies]] as const)
+    for (const [name, r] of [['ledger', this.ledger], ['proposals', this.proposals], ['NAV', this.nav], ['activity', this.activity], ['committees', this.committees], ['strategies', this.strategies], ['requests', this.desks.requests], ['routines', this.desks.routines]] as const)
       if (r.problem) return `The fund's ${name} journal doesn't check out (${r.problem}), so trading has stopped. See docs/fund.md#audit.`;
     return undefined;
   }
@@ -174,7 +174,7 @@ export class Fund {
       committees: this.committees.state(),
       ...this.strategies.state(),
       ...(halted ? { halted } : {}),
-      notes: [this.ledger, this.proposals, this.nav, this.activity, this.committees, this.strategies].flatMap((r) => (r.repaired ? [r.repaired] : [])),
+      notes: [this.ledger, this.proposals, this.nav, this.activity, this.committees, this.strategies, this.desks.requests, this.desks.routines].flatMap((r) => (r.repaired ? [r.repaired] : [])),
     };
   }
 

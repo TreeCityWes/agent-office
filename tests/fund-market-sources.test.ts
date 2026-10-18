@@ -4,6 +4,7 @@ import { assetTable } from '../src/shared/fund/assets.js';
 import { SIGNAL_KINDS } from '../src/shared/fund/state.js';
 import { MarketData } from '../src/server/fund/market/index.js';
 import { fearGreed, fred, fredRows, mempool, okxLiquidations, rssItems, sec, yahooNews } from '../src/server/fund/market/signals.js';
+import { bitbo, flowNumber, flowsTable } from '../src/server/fund/market/etf.js';
 import type { Listing, SignalAdapter } from '../src/server/fund/market/types.js';
 
 // The public signal sources against what each provider sends (captured from the real endpoints and
@@ -170,6 +171,34 @@ test('fear & greed: today’s reading and the day before’s', async (t) => {
   assert.deepEqual([s.kind, s.value, s.unit, s.text, s.at], ['sentiment', 53, '/100', 'Neutral at 53/100, from 55 the day before', 1792281600_000]);
 });
 
+// bitbo.io's flows table as it comes (trimmed to four funds and three days), newest first, then its summary rows.
+const cell = (v: string) => `<td class="cell right-align"> <span>${v}</span> </td>`;
+const BITBO = `<h2>Bitcoin ETF Flow (US$m)</h2><table class="stats-table larger-table"> <tbody>
+<tr> <th> <span>Date</span> </th> <th> <span>IBIT</span> </th> <th> <span>FBTC</span> </th> <th> <span>GBTC</span> </th> <th> <span>BITB</span> </th> <th> <span>Totals</span> </th> </tr>
+<tr>${['Oct 15, 2026', '16.7', '0.0', '-0.4', '-', '16.3'].map(cell).join('')}</tr>
+<tr>${['Oct 14, 2026', '-110.9', '-152.7', '-0.4', '2.2', '-261.8'].map(cell).join('')}</tr>
+<tr>${['Oct 13, 2026', '1,064.7', '101.2', '(0.4)', '0.0', '1,165.5'].map(cell).join('')}</tr>
+<tr>${['Total', '970.5', '-51.5', '-1.2', '2.2', '920.0'].map(cell).join('')}</tr>
+<tr>${['Average', '323.5', '-17.2', '-0.4', '0.7', '306.7'].map(cell).join('')}</tr>
+</tbody></table><p>The above table shows the changes in BTC holdings for the last 10 days.</p>`;
+
+test('bitbo.io ETF flows: the latest day’s net flow in USD, the funds that moved it, and the sessions shown', async (t) => {
+  assert.deepEqual(['16.7', '-110.9', '1,064.7', '(0.4)', '0.0', '-', ''].map(flowNumber), [16.7, -110.9, 1064.7, -0.4, 0, undefined, undefined]);
+  const table = flowsTable(BITBO);
+  assert.deepEqual(table.tickers, ['IBIT', 'FBTC', 'GBTC', 'BITB']);
+  assert.deepEqual(table.days.map((d) => [d.date, d.total]), [['Oct 13, 2026', 1165.5], ['Oct 14, 2026', -261.8], ['Oct 15, 2026', 16.3]], 'oldest first, the summary rows left out');
+  assert.deepEqual(table.days[2].flows, [16.7, 0, -0.4, undefined]);
+  const asked = serve(t, { 'bitbo.io/treasuries/etf-flows/': BITBO });
+  const [s, ...rest] = await bitbo.signals([{ symbol: 'BTC', feed: 'etf-flows', class: 'crypto' }, { symbol: 'X', feed: '../x', class: 'crypto' }], signal());
+  assert.equal(rest.length, 0, 'a feed that isn’t a page name isn’t asked');
+  assert.deepEqual(asked.map((a) => a.url.href), ['https://bitbo.io/treasuries/etf-flows/']);
+  assert.deepEqual([s.id, s.kind, s.symbol, s.value, s.unit, s.source, s.url, s.at], ['etf_flows:BTC:bitbo', 'etf_flows', 'BTC', 16_300_000, 'USD', 'bitbo', 'https://bitbo.io/treasuries/etf-flows/', Date.UTC(2026, 9, 15, 21)]);
+  assert.equal(s.text, 'US spot BTC ETFs: $16.3M on Oct 15, 2026 (IBIT $16.7M, GBTC -$400K); $920M over the last 3 sessions');
+  // A page without the table (bitbo changed it, or sent an error page) fails the source rather than reading zero.
+  serve(t, { 'bitbo.io/': '<html><body>Not here</body></html>' });
+  await assert.rejects(bitbo.signals([{ symbol: 'BTC', feed: 'etf-flows', class: 'crypto' }], signal()), /no flows table/);
+});
+
 test('market data asks a source for the feed it names, and a global one with no listings at all', async () => {
   const seen: Record<string, Listing[]> = {};
   const stub = (a: Partial<SignalAdapter> & { id: string }): SignalAdapter => ({ label: a.id, everyMs: 60_000, provides: ['news'], signals: async (ls) => ((seen[a.id] = ls), [{ id: `news:${a.id}`, kind: 'news', label: a.id, at: 1, source: a.id }]), ...a });
@@ -187,12 +216,12 @@ test('market data asks a source for the feed it names, and a global one with no 
   assert.deepEqual(md.signals().map((s) => s.source).sort(), ['liq', 'net']);
 });
 
-test('the public sources cover every kind of signal but ETF flows, which only the mock market makes', () => {
+test('the public sources cover every kind of signal', () => {
   const md = new MarketData({ mode: 'public', assets: () => assetTable(), mustWatch: () => false, onQuotes: () => {} });
   const sources = md.state().sources;
-  assert.deepEqual(sources.map((s) => s.id), ['coinbase', 'yahoo', 'okx', 'okx-liquidations', 'mempool', 'yahoo-news', 'fred', 'sec', 'fear-greed']);
+  assert.deepEqual(sources.map((s) => s.id), ['coinbase', 'yahoo', 'okx', 'okx-liquidations', 'bitbo', 'mempool', 'yahoo-news', 'fred', 'sec', 'fear-greed']);
   const covered = new Set(sources.flatMap((s) => s.provides));
-  assert.deepEqual(SIGNAL_KINDS.filter((k) => !covered.has(k)), ['etf_flows']);
+  assert.deepEqual(SIGNAL_KINDS.filter((k) => !covered.has(k)), []);
   for (const s of sources) assert.equal(s.mock, undefined);
   // Every equity the fund knows by default has its CIK; every asset has a headlines feed.
   for (const a of assetTable().values()) {

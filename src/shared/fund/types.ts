@@ -322,6 +322,8 @@ export type ActivityKind =
   | 'assignment'
   | 'message'
   | 'escalation'
+  | 'request'
+  | 'routine'
   | 'committee'
   | 'strategy'
   | 'backtest'

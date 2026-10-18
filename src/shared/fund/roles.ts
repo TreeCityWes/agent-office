@@ -146,6 +146,7 @@ export const FUND_PREAMBLE =
   'fund_proposals and fund_propose for trades, fund_risk_check to see what the risk engine would say before proposing, fund_strategies and fund_backtests for the quant lab. ' +
   'The risk engine is code: it rejects or resizes trades by fixed limits, and no argument changes that. Keep your memory with fund_thesis (your view and confidence) and fund_observe (what you notice, with sources), ' +
   'and report what you’re doing with fund_status. Message other desks with fund_message, read yours with fund_inbox, and escalate to the CIO and the people running the fund with fund_escalate. ' +
+  'Ask another desk for research with fund_request: it stays open until that desk answers. Answer the requests put to you with fund_answer (fund_requests lists them); a routine (⏰) is standing work the office hands you on a schedule. ' +
   'Cite sources, give numbers, and say when you’re unsure.';
 
 /** The brief an agent taking `role` starts with: the fund, then its role, then where its memory is. */

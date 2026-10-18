@@ -38,7 +38,7 @@ const LAYERS = {
   ui: files('src/client'),
   runtime: [...files('src/server/workers'), ...files('src/server/providers')],
   services: [
-    ...['fund', 'desks', 'committee', 'strategies', 'research', 'office'].map((n) => `src/server/fund/${n}.ts`),
+    ...['fund', 'desks', 'committee', 'strategies', 'research', 'requests', 'routines', 'office'].map((n) => `src/server/fund/${n}.ts`),
     ...files('src/server/hooks').filter((f) => /\/fund[^/]*\.ts$/.test(f)),
     ...files('src/server/ws/handlers').filter((f) => /\/fund[^/]*\.ts$/.test(f)),
   ],

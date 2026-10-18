@@ -5,6 +5,8 @@ import { DESK_STATUS_LABEL, ROLE_BY_ID, ROLES, roleBrief, type Department, type 
 import type { ActivityEvent, Actor, Proposal } from '../../shared/fund/types.js';
 import type { AgentProvider } from '../../shared/providers.js';
 import type { WorkerStatus } from '../../shared/protocol/workers.js';
+import { Requests } from './requests.js';
+import { Routines } from './routines.js';
 
 /** A worker as the desks need to know it, wherever in the building it sits. */
 export interface DeskWorker {
@@ -52,6 +54,8 @@ const START =
   'If no fund_* tools are listed for you, the office-fund command on your PATH does the same (office-fund help).';
 /** How long the fund's news about a proposal gathers before its author hears it all at once. */
 const SETTLE_MS = 1500;
+/** How often routines and overdue research requests are looked at. */
+const WORK_TICK_MS = 30_000;
 
 export function readJsonl<T>(file: string): T[] {
   let text = '';
@@ -78,8 +82,12 @@ export function readJsonl<T>(file: string): T[] {
  * agent so the next one in the role picks up from them), the messages between desks, and escalations
  * to the people running the fund. Every one of those also goes in the fund's activity log, whose
  * chain is what makes them auditable. A worker sent home simply stops counting; its role's memory stays.
+ * The research requests between desks (requests.ts) and their routines (routines.ts) are kept beside them.
  */
 export class Desks {
+  readonly requests: Requests;
+  readonly routines: Routines;
+  private workTimer: NodeJS.Timeout;
   private profiles = new Map<string, DeskProfile>();
   private messages: FundMessage[] = [];
   private pending = new Map<string, { events: ActivityEvent[]; timer: NodeJS.Timeout }>();
@@ -100,9 +108,17 @@ export class Desks {
       // no desks staffed yet
     }
     this.messages = readJsonl<FundMessage>(path.join(dir, 'messages.jsonl')).slice(-MESSAGES_KEPT).reverse();
+    this.requests = new Requests(fund, this, dir);
+    this.routines = new Routines(fund, this, dir);
+    this.workTimer = setInterval(() => {
+      this.requests.tick();
+      this.routines.tick();
+    }, WORK_TICK_MS);
+    this.workTimer.unref?.();
   }
 
   stop() {
+    clearInterval(this.workTimer);
     for (const p of this.pending.values()) clearTimeout(p.timer);
     this.pending.clear();
   }
@@ -147,6 +163,18 @@ export class Desks {
     return [this.holder('cio'), this.holder('pm')].some((d) => d && d.workerId !== authorId);
   }
 
+  /** Whether the agent holding `role` took it under `within` ms ago and hasn't reported in (fund_status) yet: it's still on its brief. */
+  settlingIn(role: string, within: number): boolean {
+    const p = this.holder(role);
+    return !!p && p.status === 'idle' && p.note === undefined && this.fund.now() - p.since < within;
+  }
+
+  /** What the agent holding `role` is doing (working, asking someone something…), if anyone holds it. */
+  processOf(role: string): WorkerStatus | undefined {
+    const p = this.holder(role);
+    return p && (this.office?.worker(p.workerId)?.status ?? 'idle');
+  }
+
   private nameOf(workerId: string): string {
     return this.office?.worker(workerId)?.name ?? workerId;
   }
@@ -157,9 +185,12 @@ export class Desks {
 
   /** What an agent taking `role` is told: its brief, and to get going. */
   brief(role: RoleDef): string {
+    const waiting = this.requests.waiting(role.id);
     return `${roleBrief(role, this.memoryDir(role.id))}
 
-${START}`;
+${waiting ? `${waiting}
+
+` : ''}${START}`;
   }
 
   state(): DesksState {
@@ -170,7 +201,7 @@ ${START}`;
       if (this.office && !w) continue;
       desks.push({ ...p, name: w?.name ?? p.workerId, floorId: w?.floorId ?? '', floorName: w?.floorName ?? '', deskId: w?.deskId ?? '', provider: w?.provider, model: w?.model, process: w?.status ?? 'idle' });
     }
-    return { desks, records: Object.fromEntries(ROLES.map((r) => [r.id, deskRecord(proposals, r.id)])), messages: this.messages.slice(0, 60) };
+    return { desks, records: Object.fromEntries(ROLES.map((r) => [r.id, deskRecord(proposals, r.id)])), messages: this.messages.slice(0, 60), requests: this.requests.state(), routines: this.routines.list() };
   }
 
   // ---- Staffing --------------------------------------------------------------------------------
@@ -208,7 +239,8 @@ ${START}`;
 
   // ---- What a desk says ------------------------------------------------------------------------
 
-  private mine(by: Actor): DeskProfile | { error: string } {
+  /** The desk an agent holds, or why it can't act as one. */
+  mine(by: Actor): DeskProfile | { error: string } {
     return this.profile(by.id) ?? { error: 'You hold no desk at the fund: a person staffs its roles from the 💼 Fund window' };
   }
 
@@ -295,7 +327,7 @@ ${START}`;
   // ---- Messages --------------------------------------------------------------------------------
 
   /** The desk `key` names: a role, by id or title, or the name of the worker holding one. */
-  private target(key: string): { role: RoleDef; profile?: DeskProfile } | { error: string } {
+  target(key: string): { role: RoleDef; profile?: DeskProfile } | { error: string } {
     const role = findRole(key);
     if (role) return { role, profile: this.holder(role.id) };
     const k = key.trim().toLowerCase();

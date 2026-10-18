@@ -39,7 +39,8 @@ export type FundClientMsg =
   | FundDeskClientMsg
   | FundCommitteeClientMsg
   | FundLabClientMsg
-  | FundResearchClientMsg;
+  | FundResearchClientMsg
+  | FundWorkClientMsg;
 
 /** Staffing the fund's desks, and talking to them (ws/handlers/fund-desks.ts). */
 export type FundDeskClientMsg =
@@ -73,6 +74,17 @@ export type FundLabClientMsg =
 export type FundResearchClientMsg =
   /** Send me the research across the desks. */
   { t: 'fund.research' };
+
+/** Research requests and routines, from the window (ws/handlers/fund-work.ts). Only an admin sends them. */
+export type FundWorkClientMsg =
+  /** A question for a desk, tracked until it answers (or it's withdrawn). */
+  | { t: 'fund.request'; request: { to: string; question: string; proposalId?: string; symbol?: string; dueInMin?: number } }
+  | { t: 'fund.request.withdraw'; id: string; note?: string }
+  /** A new routine for a desk, or a change to one (`id`): its prompt, how often, or on and off. */
+  | { t: 'fund.routine'; routine: { id?: string; role?: string; prompt?: string; everyMin?: number; on?: boolean } }
+  /** A routine typed in now. */
+  | { t: 'fund.routine.run'; id: string }
+  | { t: 'fund.routine.remove'; id: string };
 
 export type FundServerMsg =
   | { t: 'fund.brief'; brief: FundBrief }

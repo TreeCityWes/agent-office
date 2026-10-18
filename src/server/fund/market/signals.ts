@@ -1,10 +1,10 @@
 // The rest of the fund's free public signals, beside OKX's funding and open interest (public.ts):
 // liquidations from OKX, the bitcoin network from mempool.space, headlines from Yahoo Finance, US
 // macro series from FRED, filings from SEC EDGAR and the crypto fear & greed index from
-// alternative.me. None needs a key. Spot ETF flows have no free source without one, so only the mock
-// market makes those.
+// alternative.me, with US spot bitcoin ETF flows from bitbo.io (etf.ts). None needs a key.
 import { usd } from '../../../shared/fund/format.js';
 import type { Signal } from '../../../shared/fund/state.js';
+import { bitbo } from './etf.js';
 import { allOk, eachListing, getJson, getText, n, type SignalAdapter } from './types.js';
 
 const HOUR = 3_600_000;
@@ -303,4 +303,4 @@ export const fearGreed: SignalAdapter = {
 };
 
 /** The public signal sources after OKX's funding and open interest, in the order the market tab lists them. */
-export const PUBLIC_SIGNALS: readonly SignalAdapter[] = [okxLiquidations, mempool, yahooNews, fred, sec, fearGreed];
+export const PUBLIC_SIGNALS: readonly SignalAdapter[] = [okxLiquidations, bitbo, mempool, yahooNews, fred, sec, fearGreed];
