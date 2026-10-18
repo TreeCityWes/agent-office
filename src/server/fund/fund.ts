@@ -427,8 +427,8 @@ export class Fund {
    * prices, and proposals nobody decided on expire.
    */
   tick() {
-    // A fund nobody has used yet has nothing to watch or write down.
-    if (!this.ledger.used && !this.proposals.list().length) return;
+    // A fund nobody has used yet has nothing to watch or write down, but its prices still show.
+    if (!this.ledger.used && !this.proposals.list().length) return this.changed();
     if (this.halted()) return this.changed();
     const now = this.now();
     const p = this.portfolio();

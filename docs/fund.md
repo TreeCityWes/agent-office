@@ -140,6 +140,23 @@ Nothing is written until the fund is first used. The office checks every chain w
 
 The chain makes tampering evident, not impossible: the agents run as the same user as the office, so one determined to could rewrite a journal and recompute its hashes. Their tools are the only way the fund lets them in, every tool call is attributed, and an edit that doesn't recompute the chain is caught.
 
+## The 💼 Fund window
+
+**☰ → 💼 Fund** opens the fund over the office, as a trading terminal. Along the top: the NAV, the day's P&L, the total return, the drawdown, the leverage, and whether prices are coming in (**LIVE DATA**, **DATA IDLE** or **MOCK DATA**). Badges say what you're looking at: **PAPER** always, **MOCK MARKET** on simulated prices, **HALTED** when a journal didn't check out. Keys **1**–**6** turn to a tab:
+
+| Tab | What's on it |
+| --- | --- |
+| Overview | NAV, the day's and total P&L, cash, gross and net exposure, leverage and drawdown against their limits, fees paid; the NAV over time; the positions, with what each is up or down; exposure by asset class |
+| Proposals | Waiting on your approval, with the CIO, open trades, ideas and research, finished. Each shows its thesis, catalyst, evidence and dissent, every risk check with its numbers, the CIO's and the person's rulings, its fill, its exit and review, and its history. Approve or reject it with a note for the record, or exit an open trade now. **Propose a trade yourself** goes through the same risk engine as an agent's |
+| Risk | The book against each limit, exposure by correlation group, and the limits themselves, to change |
+| Market | Every price with its source and age (**MOCK** marked, a price too old to trade on in red), the latest signals, and how each source is doing |
+| Activity | The fund's own log, by kind: every proposal, verdict, ruling, fill, exit, limit change and review, with who did it |
+| Settings | The fund's name, fee and slippage, its market data (public or mock), whether a CIO or PM rules first, how long a proposal waits; paying capital in or taking it out; starting over |
+
+Anyone in the office can watch. Only admins act: approve, reject, exit, close, propose, change the limits or settings, move capital or start over. The office checks that itself, not the window (everyone on the shared password is an admin; with [accounts](../README.md#add-users), a Member only watches). When a trade waits on a person, or the fund has halted, a 💼 chip on the top bar says so to everyone in the building, with how many.
+
+The window only watches while it's open: it keeps prices coming while you look, and lets go when you close it (**✕** or **Esc**, straight back to looking around).
+
 ## The plan
 
 Each step is a pull request that leaves the office working.
@@ -147,8 +164,8 @@ Each step is a pull request that leaves the office working.
 **Phase 1: the MVP**
 
 1. **Fund core** — this page; the pure domain (`shared/fund/`); the records, paper venue, exits, market data and the `Fund` service (`server/fund/`), as `ctx.fund`; tests. Nothing visible yet, and nothing on disk or on the network until it's used.
-2. **Dashboards** — the fund's messages and state slice, and the 💼 Fund window: portfolio, positions, P&L, proposals (approve / reject), risk limits and checks, market watch, agents, activity.
-3. **Agents at the desks** — staffing a role (brief, permissions, memory folder), the fund's MCP tools (portfolio, quotes, proposals, messages, thesis and observations, status, escalate), and the desk profile on the worker's card.
+2. **Dashboards** ✅ — the fund's messages (`shared/protocol/fund.ts`) and their handlers (`server/ws/handlers/fund.ts`, where the admin check lives), the state slice, and [the 💼 Fund window](#the--fund-window) with its chip on the top bar.
+3. **Agents at the desks** — staffing a role (brief, permissions, memory folder), the fund's MCP tools (portfolio, quotes, proposals, messages, thesis and observations, status, escalate), the desk profile on the worker's card, and an Agents tab in the window.
 4. **The trading floor** — the map: desks grouped by department with their signs, ticker walls and portfolio and risk screens, the CIO's office, the committee room, and a risk event you can see from across the floor.
 
 **Phase 2**: agent-to-agent tasking and inboxes, the investment committee (BUY / HOLD / SELL ballots, the Skeptic, the CIO's summary), memory views (thesis history, confidence over time, track record), the backtest service and strategy registry (idea → research → backtest → validation → paper → approved → retired, with Sharpe, drawdown, win rate, profit factor, turnover), and performance scores.
