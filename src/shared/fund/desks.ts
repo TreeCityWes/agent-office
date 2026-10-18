@@ -189,7 +189,7 @@ export function findRole(key: string): RoleDef | undefined {
  * reviews its own trades and runs backtests; proposing, ruling, assigning and the lab's strategies are
  * by role. A worker with no role only looks.
  */
-export const FUND_TOOLS_ANYONE = ['fund_portfolio', 'fund_quotes', 'fund_market', 'fund_proposals', 'fund_activity', 'fund_risk_check', 'fund_desks', 'fund_memory', 'fund_committees', 'fund_strategies', 'fund_backtests', 'fund_history'] as const;
+export const FUND_TOOLS_ANYONE = ['fund_portfolio', 'fund_quotes', 'fund_market', 'fund_proposals', 'fund_activity', 'fund_risk_check', 'fund_desks', 'fund_memory', 'fund_research', 'fund_committees', 'fund_strategies', 'fund_backtests', 'fund_history'] as const;
 export const FUND_TOOLS_DESK = ['fund_status', 'fund_thesis', 'fund_observe', 'fund_message', 'fund_inbox', 'fund_escalate', 'fund_review', 'fund_ballot', 'fund_backtest'] as const;
 export const FUND_TOOLS_BY_PERMISSION: Record<Permission, readonly string[]> = {
   propose: ['fund_propose', 'fund_withdraw'],

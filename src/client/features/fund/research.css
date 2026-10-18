@@ -1,0 +1,48 @@
+/* The 💼 Fund window's Research tab, and the P&L on the Portfolio tab. Each desk is in its department's colour. */
+
+.fd-rs-ask { display: grid; grid-template-columns: minmax(180px, 260px) 150px 1fr auto; gap: 8px; align-items: center; }
+.fd-rs-ask + .fd-hint { margin-top: 6px; }
+@media (max-width: 760px) { .fd-rs-ask { grid-template-columns: 1fr 1fr; } }
+
+.fd-rs-working { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
+.fd-rs-desk { border: 1px solid var(--fd-line); border-left: 3px solid var(--dept); border-radius: 4px; padding: 6px 9px; background: var(--fd-panel); font: 12px var(--fd-mono); display: flex; flex-direction: column; gap: 3px; }
+.fd-rs-desk .fd-role { color: #fff; font-weight: 800; }
+.fd-rs-desk .fd-desk-note, .fd-rs-desk .fd-desk-assign { margin-top: 0; font-size: 11.5px; }
+
+.fd-rs-theses { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.fd-rs-thesis { border: 1px solid var(--fd-line); border-top: 3px solid var(--dept); border-radius: 5px; padding: 8px 10px; background: var(--fd-panel); font: 12px var(--fd-mono); display: flex; flex-direction: column; gap: 6px; }
+.fd-rs-thesis-head { display: flex; align-items: center; gap: 8px; }
+.fd-rs-thesis-head .grow { flex: 1; }
+.fd-rs-thesis .fd-role { color: var(--dept); font-weight: 800; }
+.fd-rs-thesis p { margin: 0; color: #d6dee8; line-height: 1.5; font-family: system-ui, sans-serif; font-size: 13px; }
+.fd-rs-thesis .fd-rs-why { color: #9fb0c0; font-size: 12px; font-style: italic; }
+.fd-rs-thesis-foot { color: var(--fd-muted); font-size: 11px; margin-top: auto; }
+.fd-rs-conf { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
+
+.fd-rs-sym { font: 800 12px var(--fd-mono); color: var(--fd-amber); background: none; border: 1px solid transparent; border-radius: 3px; padding: 1px 4px; cursor: pointer; }
+.fd-rs-sym:hover { border-color: var(--fd-amber); }
+.fd-rs-heat { display: block; width: 90px; height: 8px; background: #17212c; border-radius: 2px; overflow: hidden; }
+.fd-rs-heat i { display: block; height: 100%; background: linear-gradient(90deg, #1f6b46, var(--fd-amber), var(--fd-down)); background-size: 90px 100%; }
+.fd-rs-desks { display: inline-flex; gap: 3px; }
+.fd-rs-lean { display: inline-flex; gap: 6px; }
+.fd-rs-desks i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.fd-rs-latest { display: inline-block; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; color: #b7c3cf; font-size: 11.5px; }
+
+.fd-section .fd-chips { align-items: center; margin-bottom: 8px; }
+.fd-rs-gap { margin: 6px 0 12px; }
+.fd-chips .grow { flex: 1; }
+.modal.fund .fd-rs-filter { width: auto; padding: 3px 6px; font-size: 12px; }
+.fd-rs-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; max-height: 520px; overflow: auto; }
+.fd-rs-note { border-left: 3px solid var(--dept); background: var(--fd-panel); padding: 6px 10px; border-radius: 0 4px 4px 0; font-size: 13px; line-height: 1.45; color: #d6dee8; }
+.fd-rs-note-head { display: flex; gap: 8px; align-items: baseline; font: 11px var(--fd-mono); margin-bottom: 2px; flex-wrap: wrap; }
+.fd-rs-note-head .grow { flex: 1; }
+.fd-rs-note-head .fd-role { color: var(--dept); font-weight: 800; }
+.fd-rs-note .fd-src a { color: var(--fd-blue); }
+
+.fd-bars svg { height: 110px; }
+.fd-bars rect.up { fill: var(--fd-up); }
+.fd-bars rect.down { fill: var(--fd-down); }
+.fd-pnl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px 16px; }
+.fd-pnl-grid h4 { margin: 0 0 4px; color: var(--fd-amber); font: 800 10px var(--fd-mono); text-transform: uppercase; letter-spacing: .1em; }
+.fd-pnl-grid .wide { grid-column: 1 / -1; }
+.fd-strat-tag { color: #a78bfa; font-size: 11px; }

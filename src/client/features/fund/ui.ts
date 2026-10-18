@@ -1,6 +1,6 @@
 // The 💼 Fund window: a trading terminal over the office. A ticker along the top (NAV, the day, the
-// drawdown, the market data), then a tab each for the overview, the agents at the desks, proposals, the committee, the
-// quant lab's strategies and backtests, risk, market, activity and settings. It watches the fund while it's open and lets go when it closes.
+// drawdown, the market data), then a tab each for the portfolio and its P&L, the agents at the desks, their research,
+// proposals, the committee, the quant lab's strategies and backtests, risk, market, activity and settings. It watches the fund while it's open and lets go when it closes.
 import './ui.css';
 import type { ClientMsg } from '../../../shared/protocol';
 import { pct, usd } from '../../../shared/fund/format';
@@ -13,6 +13,7 @@ import { committeeTab } from './committee';
 import { marketTab } from './market';
 import { overviewTab } from './overview';
 import { proposalsTab } from './proposals';
+import { researchTab } from './research';
 import { riskTab } from './risk';
 import { settingsTab } from './settings';
 import { strategiesTab } from './strategies';
@@ -44,6 +45,7 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
   const makers: Record<TabId, () => FundTab> = {
     overview: () => overviewTab(deps),
     agents: () => agentsTab(deps),
+    research: () => researchTab(deps),
     committee: () => committeeTab(deps),
     proposals: () => proposalsTab(deps),
     strategies: () => strategiesTab(deps),
@@ -64,7 +66,7 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
   }
 
   tabBar.append(
-    ...TABS.map((t, i) => h('button', { type: 'button', role: 'tab', 'data-tab': t.id, title: `${t.label} (${(i + 1) % 10})`, onclick: () => show(t.id) }, h('span.fd-key', {}, String((i + 1) % 10)), t.label, h('span.fd-count'))),
+    ...TABS.map((t, i) => h('button', { type: 'button', role: 'tab', 'data-tab': t.id, title: i < 10 ? `${t.label} (${(i + 1) % 10})` : t.label, onclick: () => show(t.id) }, i < 10 ? h('span.fd-key', {}, String((i + 1) % 10)) : null, t.label, h('span.fd-count'))),
   );
 
   function render() {
@@ -113,7 +115,7 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
     tab.update(s, store.fundActivity);
   }
 
-  // 1–9 and 0 turn to a tab, unless you're typing.
+  // 1–9 and 0 turn to the first ten tabs, unless you're typing.
   const onKey = (e: KeyboardEvent) => {
     const t = e.target as HTMLElement | null;
     if (e.ctrlKey || e.metaKey || e.altKey || (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;

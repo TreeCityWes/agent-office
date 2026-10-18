@@ -1,6 +1,7 @@
 // The paper-trading fund (docs/fund.md): what the 💼 Fund window shows, and what people do there.
 import type { Vote } from '../fund/committee.js';
 import type { DeskMemory } from '../fund/desks.js';
+import type { ResearchView } from '../fund/research.js';
 import type { FundConfig, FundState } from '../fund/state.js';
 import type { BacktestRequest, StrategyInput, StrategyStage } from '../fund/strategy.js';
 import type { AgentEffort, AgentProvider } from './agents.js';
@@ -37,7 +38,8 @@ export type FundClientMsg =
   | { t: 'fund.reset' }
   | FundDeskClientMsg
   | FundCommitteeClientMsg
-  | FundLabClientMsg;
+  | FundLabClientMsg
+  | FundResearchClientMsg;
 
 /** Staffing the fund's desks, and talking to them (ws/handlers/fund-desks.ts). */
 export type FundDeskClientMsg =
@@ -67,6 +69,11 @@ export type FundLabClientMsg =
   | { t: 'fund.strategy.stage'; id: string; stage: StrategyStage; note?: string }
   | { t: 'fund.backtest'; run: BacktestRequest };
 
+/** The desks' research, for the Research tab (ws/handlers/fund-research.ts). Anyone may read it. */
+export type FundResearchClientMsg =
+  /** Send me the research across the desks. */
+  { t: 'fund.research' };
+
 export type FundServerMsg =
   | { t: 'fund.brief'; brief: FundBrief }
   /** The whole fund, to whoever has the window open. */
@@ -74,4 +81,6 @@ export type FundServerMsg =
   /** Activity log lines, oldest first: the latest when the window opens (`all`), then each as it happens. */
   | { t: 'fund.activity'; events: ActivityEvent[]; all?: boolean }
   /** A role's memory, to whoever asked. */
-  | { t: 'fund.memory'; role: string; memory: DeskMemory };
+  | { t: 'fund.memory'; role: string; memory: DeskMemory }
+  /** The research across the desks, to whoever asked. */
+  | { t: 'fund.research'; research: ResearchView };

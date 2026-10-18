@@ -1,8 +1,10 @@
-// The 💼 Fund window's first tab: the NAV and what moves it, the chart, the positions and the exposure.
+// The 💼 Fund window's first tab, the portfolio: the NAV and what moves it, the chart, the positions, the
+// exposure, and the P&L: each day's, where it came from, and the closed trades (pnl.ts).
 import { pct, price, usd } from '../../../shared/fund/format';
 import type { FundState } from '../../../shared/fund/state';
 import type { Exposure } from '../../../shared/fund/types';
 import { h, timeAgo } from '../../ui/dom';
+import { pnlSections } from './pnl';
 import { change, confirmButton, gauge, money, navChart, section, stat, table, type FundTab, type TabDeps } from './view';
 
 export function overviewTab(deps: TabDeps): FundTab {
@@ -10,6 +12,7 @@ export function overviewTab(deps: TabDeps): FundTab {
   const chart = h('div');
   const positions = h('div');
   const exposure = h('div');
+  const pnl = pnlSections();
   const el = h(
     'div.fd-tab',
     {},
@@ -17,6 +20,7 @@ export function overviewTab(deps: TabDeps): FundTab {
     section('NAV', chart),
     section('Positions', positions),
     section('Exposure by asset class', exposure),
+    ...pnl.el,
   );
 
   function update(s: FundState) {
@@ -52,6 +56,7 @@ export function overviewTab(deps: TabDeps): FundTab {
       p.unpriced.length ? h('div.fd-note', {}, `* No price for ${p.unpriced.join(', ')}: valued at cost.`) : '',
     );
     exposure.replaceChildren(exposureTable(p.byClass, (cls) => l.maxClassPct[cls as keyof typeof l.maxClassPct] ?? l.defaultClassPct));
+    pnl.update(s.pnl);
   }
 
   return { el, update };

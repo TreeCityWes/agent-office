@@ -86,6 +86,16 @@ export const FUND_TOOLS = [
     annotations: read,
   },
   {
+    name: 'fund_research',
+    route: 'GET research',
+    title: 'Fund research',
+    description:
+      "The fund's research across every desk: each desk's thesis now (with its confidence, the confidence before and why it changed), the latest notes the desks posted with fund_observe, what covers each asset (notes, desks, ideas, live proposals by side, the position, market signals), " +
+      'and how each desk’s closed trades did against the confidence it gave (hit rate, Brier score, average return). Read it before you research something, so you build on what the desks already know.',
+    inputSchema: schema({ symbol: str('Only this asset, like BTC.'), role: str('Only this desk, like macro.'), limit: { type: 'number', description: 'How many notes, up to 120 (40 by default).' } }),
+    annotations: read,
+  },
+  {
     name: 'fund_status',
     route: 'POST status',
     title: 'Set desk status',

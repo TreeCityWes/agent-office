@@ -1,5 +1,6 @@
 import type { FundBrief } from '../../../shared/protocol';
 import type { DeskMemory } from '../../../shared/fund/desks';
+import type { ResearchView } from '../../../shared/fund/research';
 import type { FundState } from '../../../shared/fund/state';
 import type { ActivityEvent } from '../../../shared/fund/types';
 import type { Slice } from '../store';
@@ -14,12 +15,15 @@ declare module '../store' {
     fundActivity: ActivityEvent[];
     /** The role memory asked for last, from the Agents tab. */
     fundMemory: DeskMemory | null;
+    /** The research across the desks, from the Research tab (null before it's asked for). */
+    fundResearch: ResearchView | null;
   }
   interface Topics {
     fundBrief: true;
     fund: true;
     fundActivity: true;
     fundMemory: true;
+    fundResearch: true;
   }
 }
 
@@ -33,6 +37,7 @@ export const fund: Slice = {
     s.fund = null;
     s.fundActivity = [];
     s.fundMemory = null;
+    s.fundResearch = null;
   },
   on: {
     'fund.brief'(s, m) {
@@ -51,6 +56,10 @@ export const fund: Slice = {
     'fund.memory'(s, m) {
       s.fundMemory = m.memory;
       return ['fundMemory'];
+    },
+    'fund.research'(s, m) {
+      s.fundResearch = m.research;
+      return ['fundResearch'];
     },
   },
 };

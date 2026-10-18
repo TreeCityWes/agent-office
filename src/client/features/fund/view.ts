@@ -21,8 +21,9 @@ export interface FundTab {
 }
 
 export const TABS = [
-  { id: 'overview', label: 'Overview' },
+  { id: 'overview', label: 'Portfolio' },
   { id: 'agents', label: 'Agents' },
+  { id: 'research', label: 'Research' },
   { id: 'proposals', label: 'Proposals' },
   { id: 'committee', label: 'Committee' },
   { id: 'strategies', label: 'Strategies' },

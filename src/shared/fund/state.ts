@@ -3,6 +3,7 @@
 import { checkAsset, cleanSymbol, DEFAULT_WATCHLIST } from './assets.js';
 import type { Committee } from './committee.js';
 import type { DesksState } from './desks.js';
+import type { PnlReport } from './pnl.js';
 import { checkBar, DEFAULT_BAR, type Backtest, type StrategyView, type ValidationBar } from './strategy.js';
 import type { Actor, Asset, Fill, PortfolioView, Proposal, Quote, RiskLimits } from './types.js';
 
@@ -188,6 +189,8 @@ export interface FundState {
   config: FundConfig;
   limits: RiskLimits;
   portfolio: PortfolioView;
+  /** Where its P&L came from: by day, asset, desk and strategy, over every trade it has made. */
+  pnl: PnlReport;
   /** Live proposals, and the latest that finished. */
   proposals: Proposal[];
   market: MarketState;
