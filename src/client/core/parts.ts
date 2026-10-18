@@ -28,6 +28,7 @@ import type { installClimbing } from '../features/climbing';
 import type { installCoffee } from '../features/coffee';
 import type { installDog } from '../features/dog';
 import type { installEmotes } from '../features/emotes';
+import type { installFund } from '../features/fund';
 import type { installGolf } from '../features/golf';
 import type { installGallery, installHanging } from '../features/hanging';
 import type { installHud } from '../features/hud';
@@ -115,6 +116,7 @@ export interface Parts {
   needsYou: Made<typeof installNeedsYou>;
   meeting: Made<typeof installMeeting>;
   bookshelf: Made<typeof installBookshelf>;
+  fund: Made<typeof installFund>;
   bar: Made<typeof installBar>;
   coffee: Made<typeof installCoffee>;
   smoking: Made<typeof installSmoke>;

@@ -25,7 +25,7 @@ import { openUpgrade } from '../../ui/upgrade';
 import { openWhiteboard } from '../whiteboard/ui';
 import { describeSky } from '../../world/sky';
 
-export type HudParts = Pick<Parts, 'worlds' | 'place' | 'travel' | 'you' | 'actions' | 'waiting' | 'meeting' | 'bookshelf' | 'hanging' | 'talk' | 'notifier'>;
+export type HudParts = Pick<Parts, 'worlds' | 'place' | 'travel' | 'you' | 'actions' | 'waiting' | 'meeting' | 'bookshelf' | 'fund' | 'hanging' | 'talk' | 'notifier'>;
 
 /** Listens for clicks on the HUD and the project, registers what the HUD follows (see mountHud), and binds Tab, H and F. */
 export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
@@ -64,6 +64,19 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
         chip: () => 'In a meeting',
         title: () => 'Call a meeting: workers work through a question or a task together',
         run: () => parts.meeting.showMeeting(),
+      },
+      // The paper-trading fund (docs/fund.md). Up on the top bar while a trade waits on a person's approval, or trading has stopped.
+      {
+        id: 'fund',
+        icon: '💼',
+        label: 'Fund',
+        section: 'Open',
+        count: () => store.fundBrief.awaiting,
+        status: () => store.fundBrief.awaiting > 0 || store.fundBrief.halted,
+        chip: () => (store.fundBrief.halted ? 'Fund halted' : `${store.fundBrief.awaiting} to approve`),
+        tone: () => (store.fundBrief.halted ? 'danger' : store.fundBrief.awaiting ? 'primary' : undefined),
+        title: () => 'The paper-trading fund: portfolio, proposals waiting on you, risk, market data and its record',
+        run: () => parts.fund.showFund(),
       },
       { id: 'search', icon: '🔎', label: 'Search', section: 'Open', key: '/', title: () => 'Search the chat and every terminal', run: waiting.showSearch },
       // The office has its bookshelf for them; a map of its own may not.
@@ -126,6 +139,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
     settings,
     () => saveSettings(settings),
   );
+  store.on('fundBrief', () => hud.refresh());
   ctx.keys.bind({
     code: 'Tab',
     preventDefault: true,
