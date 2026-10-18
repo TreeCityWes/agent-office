@@ -4,6 +4,8 @@ import { planAirlock, wallOpenings } from './airlock.js';
 import { CASTLE } from './castle.js';
 import { MapError, isObj, num, str } from './check.js';
 import { overlaps, planDungeon, planSendHome } from './dungeon.js';
+import { TRADING_FLOOR } from './floor.js';
+import { FLOOR_FEEDS, FLOOR_PROP_KINDS, floorFootprint, floorTop } from './floor-props.js';
 import { PROP_KINDS, boxFootprint, propFootprint, propTop } from './props.js';
 import { STATION } from './station.js';
 import { STATION_PROP_KINDS, stationFootprint, stationTop } from './station-props.js';
@@ -16,12 +18,13 @@ export { DUNGEON_SLAB, SEND_HOME_STEPS, dungeonClear, levelRoute, prisonSeat, wa
 /** The office: built in code (world/office/), and what the building is until someone picks another map. */
 export const OFFICE_MAP = 'office';
 /** The maps that come with the office, besides the office itself. */
-export const BUILTIN_MAPS: readonly MapConfig[] = [CASTLE, STATION];
+export const BUILTIN_MAPS: readonly MapConfig[] = [CASTLE, STATION, TRADING_FLOOR];
 
 /** The props each style of map can put up (see ./props.ts and ./station-props.ts): their kinds, the floor each takes and how high it reaches. */
 const STYLE_PROPS: Record<MapStyle, { kinds: Readonly<Record<string, string>>; footprint: typeof propFootprint; top(p: PropConfig): number }> = {
   castle: { kinds: PROP_KINDS, footprint: propFootprint, top: propTop },
   station: { kinds: STATION_PROP_KINDS, footprint: stationFootprint, top: stationTop },
+  floor: { kinds: FLOOR_PROP_KINDS, footprint: floorFootprint, top: floorTop },
 };
 
 const STATION_KINDS: readonly StationKind[] = ['issues', 'pulls', 'queue'];
@@ -327,6 +330,8 @@ export function planMap(input: unknown): MapPlan {
     opt(p.height, `${what}.height`, 0.3, 20);
     opt(p.length, `${what}.length`, 0.3, 120);
     if (p.light !== undefined && typeof p.light !== 'boolean') throw new MapError(`${what}.light should be true or false`);
+    if (p.text !== undefined && (typeof p.text !== 'string' || p.text.length > 60)) throw new MapError(`${what}.text should be up to 60 characters`);
+    if (p.feed !== undefined && !(FLOOR_FEEDS as readonly unknown[]).includes(p.feed)) throw new MapError(`${what}.feed should be one of ${FLOOR_FEEDS.join(', ')}`);
     // What hangs on a wall, or from the roof, has to fit under the walls' top.
     const top = kinds.top(p);
     if (top > height) throw new MapError(`props[${i}] (a ${p.kind}) reaches ${top.toFixed(1)} m up, over the hall's ${height} m walls: lower its y, or raise hall.height`);
@@ -338,6 +343,7 @@ export function planMap(input: unknown): MapPlan {
 
   // The dungeon under the hall: the hole in the floor over its stairs, with rails round it, has to be clear.
   if (c.dungeon != null && style === 'station') throw new MapError('a station-style map has no dungeon to dig: take it away ("dungeon": null), and give it an airlock instead');
+  if (c.dungeon != null && style === 'floor') throw new MapError('a trading floor is high up a tower, with no dungeon under it: take it away ("dungeon": null)');
   if (c.airlock != null && style !== 'station') throw new MapError('only a station-style map has an airlock');
   const dungeon = c.dungeon == null ? undefined : planDungeon(c.dungeon, bounds);
   if (dungeon) {

@@ -165,14 +165,14 @@ The chain makes tampering evident, not impossible: the agents run as the same us
 
 Anyone in the office can watch. Only admins act: approve, reject, exit, close, propose, call and decide committees, register, backtest and move strategies, staff and release desks, assign and message them, change the limits or settings, move capital or start over. The office checks that itself, not the window (everyone on the shared password is an admin; with [accounts](../README.md#add-users), a Member only watches). When a trade waits on a person, or the fund has halted, a 💼 chip on the top bar says so to everyone in the building, with how many.
 
-The window only watches while it's open: it keeps prices coming while you look, and lets go when you close it (**✕** or **Esc**, straight back to looking around).
+The window only watches while it's open: it keeps prices coming while you look, and lets go when you close it (**✕** or **Esc**, straight back to looking around). [The trading floor's](#the-trading-floor) screens watch too, while you're on it.
 
 ## Agents at the desks
 
 A desk is staffed by a real worker: an agent already at work in the office, or one hired for the role from the window's Agents tab. Each role is held by one worker at a time. Taking a role does three things:
 
 - **The brief.** The agent is told who it is: the role's brief, its permissions, where its memory is, and to start by reading that memory and reporting its status. A new hire starts with it as its first prompt; an agent already at work gets it typed in.
-- **The sign.** The role's sign (`🔎 Macro Analyst`) goes up over its desk, in its department's colour, and comes down when it's released. A new hire for a role takes the desk with the role's sign when it's free.
+- **The sign.** The role's sign (`🔎 Macro Analyst`) goes up over its desk, in its department's colour, and comes down when it's released. A new hire for a role takes the desk with the role's sign when it's free; otherwise, on a map with a table for each department ([the trading floor](#the-trading-floor)), a free seat at its department's table.
 - **The tools.** Its `agent-office` MCP server lists the fund's tools its role allows (below). A worker without a role sees none of them, so coding agents' tool lists stay as they were.
 
 When a worker goes home its desk is free again; the role's memory stays, and the next holder starts from the last thesis. The desks carry on when the fund is started over.
@@ -274,6 +274,19 @@ The bar and the days on paper are in ⚙️ Settings, for people only.
 
 Every strategy as it changed is in `strategies.jsonl`, and every backtest in `backtests.jsonl`, both hash-chained (see [Audit](#audit)). The moves and runs are in the activity log, and each desk's part (`strategy`, `backtested`) goes in its memory.
 
+## The trading floor
+
+**⚙️ Settings → 🏢 Building → Map → 📈 Trading floor** makes the building the fund's trading floor, high up a tower (see [the map](maps.md#the-trading-floor)). It's a map like the castle and the station, so the office comes along whole: every worker on it is a real agent at a real seat, and an empty seat is empty.
+
+- **The video wall**, over the principal's desk at the far end. Along the top, a **ticker** the width of the hall: the fund's NAV and its day, **PAPER**, then every price it holds (marked ●) or watches, green up and red down, led by a warning whenever risk needs looking at. Under it the **heatmap** (what's held, sized by its value and colored by the day's move, outlined in amber; what's only watched shares a third as much again), the **portfolio** (NAV, the day and since inception, cash, gross and net, leverage and drawdown, the NAV over time, and the positions) and the **risk board** (the five limits the Risk tab shows, as bars that turn amber at 80% of a limit and red past it, with the reasons underneath).
+- **The rooms.** The CIO's office, with the 🏛️ Executive desks and the **trade pipeline** on its wall: how many proposals are at each step of the workflow, from idea through research, proposal, risk review, CIO review, your approval, paper execution and monitoring to exit and review, which ones, and the ones stopped short. The risk room, with the 🛡️ Risk desks, a second risk board and the **beacon**. The 🧪 quant lab, its **strategies** on the wall (each one's stage, its backtest's Sharpe and its record on paper) and the desks' **theses** with their confidence on the other side. The 🗳️ investment committee's room, the meeting table, with its **committees** (the question, who has voted, and the BUY / HOLD / SELL split once the ballots are open) and every **desk** by department, with its status, across the wall.
+- **The desks.** A table to each department, its name hung over it: 🏛️ Executive (3 seats), 🛡️ Risk (5), 📈 Trading (6), 🔎 Research (8), 💻 Hot desks (4, the office's back office seats, so they open once that floor's back office is built out) and 🧪 Quant lab (6). Staff a role with a new hire from [the Agents tab](#agents-at-the-desks) and it sits at its department's table (the Skeptic with the Executive desks), or hire a worker into a seat yourself (**E** at its **+**) and give it a role. A placard over a staffed desk's monitors says which role it holds, in its department's color.
+- **The beacon**, on the risk room's corner, is worked out by code the way risk's checks are, never by a model: green and still inside the limits; amber and pulsing when a limit is at 80% or more of itself, or risk turned a proposal down in the last hour; red, flashing and turning, its light on, when a limit is broken, a loss limit is hit, or trading has halted. You can see it from anywhere on the floor, and the ticker leads with why.
+
+The screens follow the fund about once a second at most, and only read it: nothing on the floor changes the fund, and they need nobody to be an admin. They watch the fund while you're on the floor, as the window does while it's open, and say they're waiting for it until it's there.
+
+What the screens make of the fund is pure code in `shared/fund/floor.ts` (the alarm, the ticker, the heatmap's tiles and its treemap, the pipeline, the desks by department), tested in `tests/trading-floor.test.ts`. `features/fund/floor.ts` finds the screens by the `feed` the world marks them with, paints them (`floor-paint.ts`), sets the beacon and hangs the placards; the map itself is `shared/maps/floor.ts` and `client/world/floor/`.
+
 ## The plan
 
 Each step is a pull request that leaves the office working.
@@ -286,7 +299,7 @@ Each step is a pull request that leaves the office working.
 4. **The investment committee** ✅ — [committees](#the-investment-committee) (`shared/fund/committee.ts`, `server/fund/committee.ts`): sealed BUY / HOLD / SELL ballots with confidence, argument, evidence and risks, the Skeptic always seated, a confidence-weighted tally, the chair's decision, the size gate on an agent CIO's ruling, the committee tools, and the Committee tab.
 5. **Strategies and backtests** ✅ — [the quant lab](#strategies-and-backtests): strategy kinds as rules in code and a deterministic backtest engine with no look-ahead, costs and an out-of-sample split (`shared/fund/strategy.ts`, `backtest.ts`); daily price history from the public sources or the mock market, hashed (`server/fund/history.ts`); the strategy registry and its gated lifecycle, the validation bar, four eyes, signals on paper that a strategy's trades must follow (`server/fund/strategies.ts`); the lab tools; and the Strategies and Backtests tabs.
 6. **Research and P&L** ✅ — [the research](#research) gathered from every desk's memory, coverage by asset and calls scored with a Brier score (`shared/fund/research.ts`, `server/fund/research.ts`); P&L by day, asset, desk and strategy, reconciled to the book after fees (`shared/fund/pnl.ts`); `fund_research`; the Research tab, and the P&L on the Portfolio tab.
-7. **The trading floor** — the map: desks grouped by department with their signs, ticker walls and portfolio and risk screens, the CIO's office, the committee room, and a risk event you can see from across the floor.
+7. **The trading floor** ✅ — [the map](#the-trading-floor) (`shared/maps/floor.ts`, `client/world/floor/`): a tower floor with the city outside, desks by department with their signs, a video wall with the ticker, the heatmap, the portfolio and risk, glass rooms for the CIO, risk, the quant lab and the committee with the pipeline, strategies, theses, committees and desks on their walls, placards over the staffed desks, and a risk beacon you can see from across the floor (`shared/fund/floor.ts`, `features/fund/floor.ts`).
 
 **Phase 2**: research requests that track their answers, and agents that pick work up on a schedule.
 

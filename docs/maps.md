@@ -2,9 +2,9 @@
 
 Back to the [README](../README.md).
 
-The office is one map the building can be. Under **⚙️ Settings → 🏢 Building → Map**, anyone can change it for everyone, on every floor: to the **🏰 Castle**, to the **🚀 Space station**, or to a map of your own. Everything that makes the office work comes along: the workers and their terminals, the issues and PR boards, the task queue and its agent, the services board, meetings, the merge gong, the budget and the limits. Workers keep their seats, since every map places the same seats (see [Seats](#seats)), so a map can change while they work.
+The office is one map the building can be. Under **⚙️ Settings → 🏢 Building → Map**, anyone can change it for everyone, on every floor: to the **🏰 Castle**, to the **🚀 Space station**, to the 💼 fund's **📈 Trading floor**, or to a map of your own. Everything that makes the office work comes along: the workers and their terminals, the issues and PR boards, the task queue and its agent, the services board, meetings, the merge gong, the budget and the limits. Workers keep their seats, since every map places the same seats (see [Seats](#seats)), so a map can change while they work.
 
-The office has plenty of its own that a map doesn't (the elevator, the balcony, the rooftop bar, the lounge, the dog, pictures on the walls). On another map you go to another project from the floor list in the top-left corner (or **☰ → Floors**), and each project's hall is dressed in its own colors: the castle's banners and shields, the station's lines of light.
+The office has plenty of its own that a map doesn't (the elevator, the balcony, the rooftop bar, the lounge, the dog, pictures on the walls). On another map you go to another project from the floor list in the top-left corner (or **☰ → Floors**), and each project's hall is dressed in its own colors: the castle's banners and shields, the station's and the trading floor's lines of light.
 
 ## The castle
 
@@ -28,6 +28,18 @@ A long pressurised deck in orbit: white hull panels and dark plating, ribs overh
 - **The benches.** Two long benches down each side of the deck, where the workers sit at their laptops. The seats toward the middle fill first.
 - **The boards** are displays on the side walls (*Incoming signals* for issues, *Mission queue*, *Docking requests* for pull requests, *Subsystems* for services), a board agent at a console under each of the first three. The **briefing table**, aft on the starboard side, is the meeting room, with its display on a stand beside it. The merge gong is by the bridge, there's a drinks dispenser aft (the coffee), and a holo-table in the middle of the deck with the Earth turning over it.
 - **The airlock.** Send a worker home (**X**) and **Security**, on watch by the airlock in the starboard wall, comes for it, says its piece, waits while it packs its box, and marches it across the deck. The inner door slides up, it's shoved through, and the door comes down behind it: you can see it through the porthole, under the red lights. Then the outer hatch parts and it's blown out into space, tumbling, box and all. **Stand at one of the two big observation windows either side of the airlock to watch it go.** It doesn't come back: everyone ever ejected is still out there, adrift, each off on a heading of its own and turning over as it goes, quickly at first and slower by the hour, out to about 40 m. They waste away as the castle's prisoners do: thinner for an hour until the air's gone (☠️ on its name tag), then down to a skeleton (💀) over the next twelve. The latest 30 are still to be seen; the ones from before them have drifted out of sight. It's the same for workers that go home on their own when their pull request merges, ones another worker sends home, and ones the task queue sends home to make room; a meeting's workers still just walk out of the docking port. Each floor has its own, and it's the same list the castle's dungeon keeps (the project's `.agent-office/jail.json`): change the building from the station to the castle and the ones adrift are in the cells.
+
+## The trading floor
+
+The 💼 fund's floor, high up a tower: open plan, glass floor to ceiling down the two long sides with a city of towers outside (its windows lit at night), carpet underfoot and light panels overhead. At the far end, a video wall of the fund's screens under a ticker the width of the hall; at the near end, the lifts.
+
+- **The principal's desk.** On a low dais before the video wall. You arrive at it (if nobody else is sitting there); **E** at it sits you back down, and the project's name is on the wall behind it.
+- **The line.** As in the castle, a worker that's done or waiting on you comes and lines up before your desk, the one that has waited longest at the front, and from the desk **E**, **P**, **O** and **X** are for whoever's first in line.
+- **The Chief of staff** stands by your desk, in a suit. Speak to them (**E** by them, **K** from your desk) and say what a new worker should do: it goes to the first free seat. A worker the task queue sends comes up in the lifts.
+- **The desks.** A table to each department, its name hung over it: 🏛️ Executive, 🛡️ Risk, 📈 Trading, 🔎 Research, 💻 Hot desks and 🧪 Quant lab, with a chair and a pair of monitors at every seat. Every seat is out from the start, a **+** over each free one (but the hot desks' until that floor's back office is built out: they're its seats, `desk-17` to `desk-20`, see [Room to grow](features.md)): **E** at one hires a worker into that seat, so someone hired at *Trading, seat 3* sits with the traders, and a new hire for one of the fund's roles sits at its department's table.
+- **The rooms.** Glass rooms in the four corners: the CIO's office, the risk room (the **beacon** on its corner), the quant lab, and the investment committee's room, which is the meeting room.
+- **The screens** show the fund live, the beacon turns amber or red with its risk, and a placard over each staffed desk says which role sits there: see [the trading floor](fund.md#the-trading-floor) in the fund's docs. The boards (issues, queue, pull requests, services) are on the wall by the lifts, a board agent at a console under each of the first three. The gong is by the quant lab, and there's a drinks dispenser by the lifts (the coffee).
+- **Sending a worker home** (**X**): it packs up and walks out to the lifts.
 
 ## Maps of your own
 
@@ -119,7 +131,7 @@ A map that won't load (bad JSON, something outside the hall, too few seats, a pr
 | `id` | Lowercase letters, digits and dashes, up to 40. The building's pick is saved by it. **Required.** |
 | `name`, `icon`, `description` | What Settings shows. `name` is **required**. |
 | `extends` | Another map's `id` to start from. |
-| `style` | Which builder puts it up: `"castle"` (a stone hall) or `"station"` (a space station). Each has props of its own (see [Props](#props)); a castle can have a dungeon, a station an airlock. **Required.** |
+| `style` | Which builder puts it up: `"castle"` (a stone hall), `"station"` (a space station) or `"floor"` (a trading floor). Each has props of its own (see [Props](#props)); a castle can have a dungeon, a station an airlock. **Required.** |
 | `hall` | `{ width, length, height }`: the room (8 to 110 m either way), and how high its walls are (4 to 40 m). **Required.** |
 | `spawn` | `{ x, z, rotY }`: where you stand when you arrive and the throne's taken. Without it, at the door, facing the middle. |
 | `door` | `{ x, z }`: just inside the way in and out. The doorway goes in the nearest wall; workers come in and go home through it. **Required.** |
@@ -132,7 +144,7 @@ A map that won't load (bad JSON, something outside the hall, too few seats, a pr
 | `boards` | `{ issues, queue, pulls, services }`, each `{ x, y, z, rotY, width, height, label? }`: the boards on the walls, `rotY` the way each faces. **Required.** |
 | `props` | `[{ kind, x, z, … }]`: everything else, from the list below. |
 | `agents` | `{ outfit: "peasant" \| "none", ageMinutes }`: how the workers dress, and how many minutes of work until they look spent (`0`, the default: never). |
-| `palette` | CSS colors: a castle's `{ stone, floor, carpet, wood, trim }`, a station's `{ hull, deck, panel, metal, glow }`. The castle's banners and shields, and the station's lines of light, take each floor's own color. |
+| `palette` | CSS colors: a castle's `{ stone, floor, carpet, wood, trim }`, a station's or a trading floor's `{ hull, deck, panel, metal, glow }`. The castle's banners and shields, and the station's and the trading floor's lines of light, take each floor's own color. |
 | `dungeon` | A dungeon under the hall, on a castle: see [The dungeon](#the-dungeon). Optional (`null` takes the castle's away). |
 | `airlock` | An airlock in a wall, on a station: see [The airlock](#the-airlock). Optional (`null` takes the station's away, and its `sendHome` has to go with it). |
 | `sendHome` | What happens to a worker sent home: see [Sending workers home](#sending-workers-home). Without it (or `null`), it packs up and walks out of the door. |
@@ -183,6 +195,22 @@ A station's:
 | `table` | A console table with nothing to sit at, `width` by `length`. |
 
 Give a `lamp` `"light": true` and it lights the deck for real (the first six do; the rest glow).
+
+A trading floor's:
+
+| `kind` | What it is |
+| --- | --- |
+| `panel` | A light panel let into the ceiling at `y`, `width` by `length`. |
+| `ticker` | A ticker band on a wall with the fund's prices running along it, its middle at `y`, `length` long (it can run the whole wall) and `height` high, facing `rotY`. |
+| `wall` | A big display on a wall, its middle at `y`, `width` by `height`, facing `rotY`, showing the fund live: `feed` is `portfolio`, `heatmap`, `risk`, `pipeline`, `desks`, `research`, `strategies` or `committee` (see [the trading floor](fund.md#the-trading-floor)). |
+| `glass` | A glass partition, `length` long along `rotY` and `height` high (3 m unless you say), frosted at eye height: walls for a room on the floor. |
+| `partition` | A solid partition, like `glass`: something to hang a display on, either side. |
+| `sign` | A sign saying `text` (up to 60 characters), its middle at `y`, facing `rotY` and the other way too. |
+| `beacon` | The risk beacon, at `y`: green and still while the fund's risk is fine, amber and pulsing near a limit, red, flashing and turning past one. |
+| `plant` | A tall plant in a pot. |
+| `screen`, `planter`, `gong`, `dispenser`, `table` | The station's (above). |
+
+Give a `panel` `"light": true` and it lights the floor for real (the first six do; the rest glow). Of the floor's four walls, the one the way in is in and the one facing it are solid; the other two are glass, with the city beyond.
 
 ### The dungeon
 
@@ -271,10 +299,11 @@ A map without a dungeon can still have a script: a guard who walks each worker t
 
 ## Adding to the code
 
-- **The model** is in [`src/shared/maps/`](../src/shared/maps): `types.ts` is the schema, `index.ts` checks a config and works out its plan (every seat, the line, the tables and the meeting table with what was left out filled in, the boards and what's in the way for walking round), `props.ts` has the castle's props, the floor each takes and how high it reaches (`station-props.ts`, the station's), and `castle.ts` and `station.ts` are the castle and the station ([`docs/maps/castle.json`](maps/castle.json) and [`station.json`](maps/station.json) are written from them: `UPDATE_CASTLE_JSON=1 node --import tsx --test tests/maps.test.ts`). The server keeps the building's pick in `.agent-office/map.json` ([`src/server/maps.ts`](../src/server/maps.ts)) and checks where people sit against the map.
+- **The model** is in [`src/shared/maps/`](../src/shared/maps): `types.ts` is the schema, `index.ts` checks a config and works out its plan (every seat, the line, the tables and the meeting table with what was left out filled in, the boards and what's in the way for walking round), `props.ts` has the castle's props, the floor each takes and how high it reaches (`station-props.ts`, the station's), `floor-props.ts` the trading floor's, and `castle.ts`, `station.ts` and `floor.ts` are the castle, the station and the trading floor ([`docs/maps/castle.json`](maps/castle.json), [`station.json`](maps/station.json) and [`floor.json`](maps/floor.json) are written from them: `UPDATE_CASTLE_JSON=1 node --import tsx --test tests/maps.test.ts`). The server keeps the building's pick in `.agent-office/map.json` ([`src/server/maps.ts`](../src/server/maps.ts)) and checks where people sit against the map.
 - **A new prop kind** is its name in its style's kinds (`PROP_KINDS` in `props.ts` for a castle, `STATION_PROP_KINDS` in `station-props.ts` for a station), the floor it takes and how high it reaches beside them, and how it looks in the style's builder's `PROPS` table ([`src/client/world/castle/props.ts`](../src/client/world/castle/props.ts), [`src/client/world/station/props.ts`](../src/client/world/station/props.ts)), which won't compile without it.
 - **The station** is built in [`src/client/world/station/`](../src/client/world/station): `shell.ts` (the deck, the hull and what's cut through it, from the plan's `openings`), `airlock.ts`, `seats.ts`, `boards.ts`, `props.ts`, `people.ts`, and `space.ts` with `planets.ts` for what's outside. Space is drawn first, behind everything and without depth, and rides along with your eye; a curtain round it hides the office's own sky.
 - **A new style** is its name in `MAP_STYLES`, its props in `STYLE_PROPS` (`shared/maps/index.ts`), and a builder in [`src/client/world/styles.ts`](../src/client/world/styles.ts) that turns a plan into a `World` ([`src/client/world/world.ts`](../src/client/world/world.ts)): a scene group, colliders, what can be used, a view for every seat, the four boards, a walk grid, the ways in and out, its room (wall thickness, roofed or not), and optionally a gong, the meeting's board, a herald, a dungeon or an airlock, how it sounds, how it's lit (`mood`) and `dispose`. [`src/client/core/worlds.ts`](../src/client/core/worlds.ts), which puts it up, needs nothing else. The plan puts the seats, lecterns, meeting chairs and throne where the castle's furniture has them (a bench 0.85 m out from each place at a table, and so on), and that's what the workers walk round, so a new style builds its furniture there.
+- **The trading floor** is built in [`src/client/world/floor/`](../src/client/world/floor), mostly from the station's kit: `shell.ts` (the floor, the ceiling, the solid and glass walls, the lifts), `props.ts`, `desks.ts`, `people.ts` (the Chief of staff), `textures.ts` and `outside.ts` (the city). Its displays, ticker and beacon carry a `feed` in their `userData` for the 💼 fund to find and drive ([`src/client/features/fund/floor.ts`](../src/client/features/fund/floor.ts)), so the world knows nothing about the fund.
 - **Workers walking about** (lining up, coming back, running to their seats) is [`src/client/world/court.ts`](../src/client/world/court.ts), for any map other than the office.
 - **The dungeon and sending workers home**: [`src/shared/maps/dungeon.ts`](../src/shared/maps/dungeon.ts) checks a map's `dungeon` and `sendHome`, works out the vault, the stairs and the cells' seats, how far a prisoner has wasted away (`wasting`) and the way between the hall and the dungeon (`levelRoute`). The client builds it in [`src/client/world/dungeon.ts`](../src/client/world/dungeon.ts), acts a script out in [`src/client/features/workers/sendhome.ts`](../src/client/features/workers/sendhome.ts) and shows the prisoners in [`src/client/features/workers/jail.ts`](../src/client/features/workers/jail.ts); the server keeps each floor's prisoners in `.agent-office/jail.json` ([`src/server/jail.ts`](../src/server/jail.ts)) and hands them out with the `worker.remove` that took them away. **A new kind of step** is its name in `SEND_HOME_STEPS`, its checking in `planSendHome`, and its `begin` and `tick` in `features/workers/sendhome.ts`; one with much to act out has a file of its own beside it (`lockup.ts` for `jail`, `eject.ts` for `eject`).
 - **The airlock and whoever's adrift**: [`src/shared/maps/airlock.ts`](../src/shared/maps/airlock.ts) checks a map's `airlock`, works out what's cut through a station's walls (`wallOpenings`) and where someone ejected has drifted to by now (`adrift`, from their id and when they went, so every browser agrees). The client shows them in [`src/client/features/workers/adrift.ts`](../src/client/features/workers/adrift.ts), from the same list the dungeon's prisoners are kept in.
