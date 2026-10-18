@@ -2,6 +2,7 @@ import type { Asset, Quote } from '../../../shared/fund/types.js';
 import type { FundConfig, MarketState, Signal, SourceStatus } from '../../../shared/fund/state.js';
 import { MockMarket } from './mock.js';
 import { coinbase, okx, yahoo } from './public.js';
+import { PUBLIC_SIGNALS } from './signals.js';
 import type { Listing, PriceAdapter, SignalAdapter } from './types.js';
 
 /** How long the fund keeps asking for prices after anyone last looked or an agent last asked. */
@@ -61,7 +62,7 @@ export class MarketData {
     else if (mode === 'mock') {
       const mock = new MockMarket();
       this.sources = { prices: [mock.prices], signals: [mock.signalSource] };
-    } else this.sources = { prices: [coinbase, yahoo], signals: [okx] };
+    } else this.sources = { prices: [coinbase, yahoo], signals: [okx, ...PUBLIC_SIGNALS] };
     this.status.clear();
     for (const a of [...this.sources.prices, ...this.sources.signals])
       this.status.set(a.id, { id: a.id, label: a.label, provides: 'provides' in a ? [...a.provides] : ['prices'], ok: false, ...(a.mock ? { mock: true } : {}), ...('delayed' in a && a.delayed ? { delayed: true } : {}) });
@@ -135,8 +136,9 @@ export class MarketData {
   private async refresh(a: PriceAdapter | SignalAdapter) {
     if (this.running.has(a.id)) return;
     const mode = this.mode;
-    const listings = this.listings(a.mock ? 'mock' : a.id);
-    if (!listings.length) return;
+    const own = 'signals' in a ? a : undefined;
+    const listings = this.listings(a.mock ? 'mock' : own?.feed ?? a.id);
+    if (!listings.length && !own?.global) return;
     this.running.add(a.id);
     this.lastRun.set(a.id, this.now());
     const st = this.status.get(a.id);

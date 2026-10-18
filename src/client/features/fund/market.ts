@@ -2,9 +2,18 @@
 // signals the desks read (funding, open interest, flows, news…), and whether each source is answering.
 import { assetTable } from '../../../shared/fund/assets';
 import { price, usd } from '../../../shared/fund/format';
-import type { FundState } from '../../../shared/fund/state';
+import { SIGNAL_KINDS, type FundState, type Signal } from '../../../shared/fund/state';
 import { h, timeAgo } from '../../ui/dom';
 import { change, section, table, type FundTab } from './view';
+
+/** The newest few signals of each kind, kind by kind, so a slow monthly series isn't crowded out by headlines. */
+const PER_KIND = 6;
+function byKind(signals: readonly Signal[]): Signal[] {
+  return SIGNAL_KINDS.flatMap((k) => signals.filter((g) => g.kind === k).slice(0, PER_KIND));
+}
+
+/** A signal's reading: dollars the way the rest of the window shows them ($1.4B), anything else as it came. */
+const signalValue = (v: number, unit?: string) => (unit === 'USD' ? usd(v, { compact: true }) : `${v.toLocaleString('en-US', { maximumFractionDigits: 4 })}${unit ? ` ${unit}` : ''}`);
 
 export function marketTab(): FundTab {
   const quotes = h('div');
@@ -41,11 +50,11 @@ export function marketTab(): FundTab {
     signals.replaceChildren(
       table(
         ['Kind', 'Asset', 'Signal', 'Value', 'Source', 'When'],
-        s.market.signals.slice(0, 60).map((g) => [
+        byKind(s.market.signals).map((g) => [
           g.kind.replace(/_/g, ' '),
           g.symbol ?? '',
-          g.url && /^https?:\/\//.test(g.url) ? h('a', { href: g.url, target: '_blank', rel: 'noopener noreferrer' }, g.label) : g.text ? h('span', { title: g.text }, g.label) : g.label,
-          g.value !== undefined ? h('span.num', {}, `${g.value.toLocaleString('en-US', { maximumFractionDigits: 4 })}${g.unit ? ` ${g.unit}` : ''}`) : (g.text ?? ''),
+          g.url && /^https?:\/\//.test(g.url) ? h('a', { href: g.url, target: '_blank', rel: 'noopener noreferrer', title: g.text ?? '' }, g.label) : g.text ? h('span', { title: g.text }, g.label) : g.label,
+          g.value !== undefined ? h('span.num', {}, signalValue(g.value, g.unit)) : (g.text ?? ''),
           h('span', { class: g.mock ? 'fd-mock' : '' }, g.mock ? 'MOCK' : g.source),
           timeAgo(g.at),
         ]),

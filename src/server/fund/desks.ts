@@ -38,6 +38,8 @@ export interface DeskFund {
   changed(): void;
   /** What the CIO should know before ruling on it: that it needs the committee first. */
   beforeRuling?(p: Proposal): string;
+  /** Takes an idea into research. */
+  research?(id: string, by: Actor, note: string): Promise<unknown>;
 }
 
 type Result<T extends object = object> = ({ ok: true } & T) | { error: string };
@@ -345,6 +347,9 @@ ${START}`;
       this.save();
     }
     this.fund.log(kind === 'assignment' ? 'assignment' : 'message', from, `${kind === 'assignment' ? 'Assigned the' : 'To the'} ${t.role.title}: ${c.text.slice(0, 200)}`, c.proposalId ? { proposalId: c.proposalId } : {});
+    // An idea handed to a desk, or asked of a research or quant desk, is under research from now.
+    if (c.proposalId && this.fund.proposals.get(c.proposalId)?.stage === 'idea' && (kind === 'assignment' || t.role.department === 'research' || t.role.department === 'quant'))
+      void this.fund.research?.(c.proposalId, from, `${kind === 'assignment' ? 'assigned to' : 'asked of'} the ${t.role.title}`);
     const err = this.office?.tell(t.profile.workerId, this.letter(m), from.name);
     return { ok: true, message: m, delivered: !err, ...(err ? { note: `It's in their inbox, but couldn't be typed in: ${err}` } : {}) };
   }
