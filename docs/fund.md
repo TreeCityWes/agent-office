@@ -77,7 +77,7 @@ agents/macro/
   decisions.jsonl       its recommendations and proposals, and how they turned out
 ```
 
-Agents add to them through tools (`fund_thesis`, `fund_observe`), not by editing the files, so every entry is stamped and attributed. They read them freely, or through `fund_memory`. Decisions are written by the office: each proposal a desk makes, withdraws, rules on or reviews. The messages between desks are one more journal beside them, `messages.jsonl`, and who holds which desk is `desks.json`.
+Agents add to them through tools (`fund_thesis`, `fund_observe`), not by editing the files, so every entry is stamped and attributed. They read them freely, or through `fund_memory`; [`fund_research`](#research) reads every desk's at once. Decisions are written by the office: each proposal a desk makes, withdraws, rules on or reviews. The messages between desks are one more journal beside them, `messages.jsonl`, and who holds which desk is `desks.json`.
 
 ### Portfolio
 
@@ -147,12 +147,13 @@ The chain makes tampering evident, not impossible: the agents run as the same us
 
 ## The 💼 Fund window
 
-**☰ → 💼 Fund** opens the fund over the office, as a trading terminal. Along the top: the NAV, the day's P&L, the total return, the drawdown, the leverage, and whether prices are coming in (**LIVE DATA**, **DATA IDLE** or **MOCK DATA**). Badges say what you're looking at: **PAPER** always, **MOCK MARKET** on simulated prices, **HALTED** when a journal didn't check out. Keys **1**–**9** and **0** turn to a tab:
+**☰ → 💼 Fund** opens the fund over the office, as a trading terminal. Along the top: the NAV, the day's P&L, the total return, the drawdown, the leverage, and whether prices are coming in (**LIVE DATA**, **DATA IDLE** or **MOCK DATA**). Badges say what you're looking at: **PAPER** always, **MOCK MARKET** on simulated prices, **HALTED** when a journal didn't check out. Keys **1**–**9** and **0** turn to the first ten tabs (Settings has no key):
 
 | Tab | What's on it |
 | --- | --- |
-| Overview | NAV, the day's and total P&L, cash, gross and net exposure, leverage and drawdown against their limits, fees paid; the NAV over time; the positions, with what each is up or down; exposure by asset class |
+| Portfolio | NAV, the day's and total P&L, cash, gross and net exposure, leverage and drawdown against their limits, fees paid; the NAV over time; the positions, with what each is up or down; exposure by asset class. Then the P&L: each day's as a bar (best and worst days named); where it came from by asset, by desk and by strategy, realized on closed trades and open on the rest, with each bucket's closed wins; any realized P&L no trade accounts for; and the latest closed trades with their entry, exit, P&L and return |
 | Agents | Every role by department, staffed or vacant. A staffed desk shows its agent, what its process is doing and the status it reports, its assignment, thesis and confidence, and its record; **Memory** opens its thesis history, observations and decisions. Staff a vacant desk with an agent already at work or a new hire; **Hire** on the team bar staffs whichever of the core team (the CIO, the Macro and Crypto Analysts, the Quant Researcher and the Skeptic) is missing, in one go. Assign a task, send a message or release a desk. Underneath, the messages between the desks |
+| Research | [The desks' research](#research): **Ask a desk to research** something (an assignment, typed into its agent); what each staffed desk is doing now; every desk's thesis with its confidence and how far it moved; coverage by asset, as a heat bar, with the notes, the desks writing, ideas and live proposals, the position and the signals on each (click an asset for its notes); ideas still being researched; every research note, by department or asset, with its sources; and each desk's calls scored: hit rate, average confidence, Brier score, average return and realized P&L, then the latest calls |
 | Proposals | Waiting on your approval, with the CIO, open trades, ideas and research, finished. Each shows its thesis, catalyst, evidence and dissent, every risk check with its numbers, the CIO's and the person's rulings, its fill, its exit and review, and its history. Approve or reject it with a note for the record, or exit an open trade now. **Propose a trade yourself** goes through the same risk engine as an agent's. A proposal a committee sat on says how it went |
 | Committee | [Investment committees](#the-investment-committee), sitting and decided. Each shows its question and proposal, its seats (the Skeptic marked 😈) and who has voted, then, once the ballots are open, every ballot with its argument, evidence and risks, the tally and the decision. **Call a committee** puts a question or a proposal to the desks you tick, the Skeptic always among them. Open the ballots early, or decide one that waits on a person (or over its chair) |
 | Strategies | The [quant lab's](#strategies-and-backtests) board: every strategy by stage (Idea, Research, Backtest, Validation, Paper trading, Approved, and Retired below) with its rules, universe and owner; its latest backtest (open it in Backtests) and whether that clears the validation bar; its signal and record on paper; its hypothesis, checks and history. **Register a strategy**, backtest one, move it to its next stage (the card says what its gate is waiting for), send it back to research or retire it |
@@ -193,6 +194,7 @@ What an agent at a desk can call, from its `agent-office` MCP server, or from th
 | --- | --- | --- |
 | `fund_portfolio`, `fund_quotes`, `fund_market` | anyone | the paper book, prices with their source and age, the market's signals |
 | `fund_proposals`, `fund_activity`, `fund_desks`, `fund_memory` | anyone | proposals by stage or one in full, the log, who holds which desk, a role's memory |
+| `fund_research` | anyone | [the research](#research): every desk's thesis now, the latest notes, coverage by asset and each desk's calls scored against its confidence, narrowed to an asset or a role |
 | `fund_risk_check` | anyone | what the risk engine would say to a trade, without proposing it |
 | `fund_status`, `fund_thesis`, `fund_observe` | a desk | report its status, change its thesis and confidence, write down what it saw |
 | `fund_message`, `fund_inbox`, `fund_escalate` | a desk | message another desk, read what came in, escalate to the CIO and the room |
@@ -208,6 +210,20 @@ What an agent at a desk can call, from its `agent-office` MCP server, or from th
 | `fund_strategy`, `fund_strategy_stage` | CIO, PM, Quant and Strategy Researchers, Backtester | register or edit a strategy, move it through the lifecycle |
 
 None of them approves a trade, changes a limit or touches the books: a person approves, and approving runs risk again.
+
+## Research
+
+The fund's research is what the desks write in their memory, gathered across every role (`shared/fund/research.ts`, `server/fund/research.ts`). The window's Research tab and the `fund_research` tool show the same thing:
+
+- **Theses.** Each desk's thesis now, its confidence, the confidence its last thesis had (so you can see a desk turn), why it changed, and how many it has written.
+- **Notes.** Every observation (`fund_observe`), newest first, with the desk, the asset and the sources. Only a web address is a link.
+- **Coverage.** Every asset the fund watches, holds, writes about, signals on or proposes. The ones it holds come first, then the hottest: notes, plus twice the ideas and live proposals, plus the signals. Each asset shows who wrote about it and the latest note.
+- **Ideas.** Proposals still at Idea or Research.
+- **Calls.** Every trade a desk proposed that has closed is a call, scored against the confidence it was proposed with. Per desk: calls, hit rate, average confidence, average return, realized P&L and the **Brier score**, the mean of (confidence as a chance − 1 if it made money, else 0)². Zero is perfect; 0.25 is what always saying 50% scores, so a desk below it says more than a coin. A person's own trades aren't scored.
+
+To ask for research, tell a desk from the tab (or have the CIO, PM or CRO use `fund_assign`). It's an assignment like any other: typed into the agent, its current task on the Agents tab, and in the log. What comes back lands here as the desk writes it.
+
+It reads the memory files on disk, so the window asks for it when the tab opens, again a few seconds after a desk writes a thesis or a note or a trade closes, and at least once a minute while you look. Nothing in it moves money or changes a desk's memory.
 
 ## The investment committee
 
@@ -269,8 +285,9 @@ Each step is a pull request that leaves the office working.
 3. **Agents at the desks** ✅ — [staffing a role](#agents-at-the-desks) (brief, permissions, memory folder, the sign over its desk), [the fund's tools](#the-fund-tools) on the agents' MCP server and the `office-fund` command, messages, assignments and escalations between the desks, the desk profiles, and the Agents tab.
 4. **The investment committee** ✅ — [committees](#the-investment-committee) (`shared/fund/committee.ts`, `server/fund/committee.ts`): sealed BUY / HOLD / SELL ballots with confidence, argument, evidence and risks, the Skeptic always seated, a confidence-weighted tally, the chair's decision, the size gate on an agent CIO's ruling, the committee tools, and the Committee tab.
 5. **Strategies and backtests** ✅ — [the quant lab](#strategies-and-backtests): strategy kinds as rules in code and a deterministic backtest engine with no look-ahead, costs and an out-of-sample split (`shared/fund/strategy.ts`, `backtest.ts`); daily price history from the public sources or the mock market, hashed (`server/fund/history.ts`); the strategy registry and its gated lifecycle, the validation bar, four eyes, signals on paper that a strategy's trades must follow (`server/fund/strategies.ts`); the lab tools; and the Strategies and Backtests tabs.
-6. **The trading floor** — the map: desks grouped by department with their signs, ticker walls and portfolio and risk screens, the CIO's office, the committee room, and a risk event you can see from across the floor.
+6. **Research and P&L** ✅ — [the research](#research) gathered from every desk's memory, coverage by asset and calls scored with a Brier score (`shared/fund/research.ts`, `server/fund/research.ts`); P&L by day, asset, desk and strategy, reconciled to the book after fees (`shared/fund/pnl.ts`); `fund_research`; the Research tab, and the P&L on the Portfolio tab.
+7. **The trading floor** — the map: desks grouped by department with their signs, ticker walls and portfolio and risk screens, the CIO's office, the committee room, and a risk event you can see from across the floor.
 
-**Phase 2**: confidence over time and performance scores per desk, research requests that track their answers, and agents that pick work up on a schedule.
+**Phase 2**: research requests that track their answers, and agents that pick work up on a schedule.
 
 **Phase 3**: richer data (news, on-chain, filings, macro, ETF flows), broker adapters, more of the office acting out the fund, and live execution behind strict approvals, if ever.

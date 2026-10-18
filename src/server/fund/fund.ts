@@ -3,6 +3,7 @@ import { existsSync, renameSync } from 'node:fs';
 import { assetTable, cleanSymbol } from '../../shared/fund/assets.js';
 import { rollMarks, valuePortfolio } from '../../shared/fund/book.js';
 import { price, usd } from '../../shared/fund/format.js';
+import { pnlReport } from '../../shared/fund/pnl.js';
 import { checkProposalInput, moveProposal, STAGE_LABEL } from '../../shared/fund/proposals.js';
 import { checkLimits, evaluateRisk } from '../../shared/fund/risk.js';
 import { ROLE_BY_ID, type Permission } from '../../shared/fund/roles.js';
@@ -156,12 +157,14 @@ export class Fund {
     const live = all.filter((p) => WATCHED.includes(p.stage) || p.stage === 'idea' || p.stage === 'research' || p.stage === 'exited');
     const done = all.filter((p) => !live.includes(p)).slice(0, FINISHED_SHOWN);
     const halted = this.halted();
+    const portfolio = this.portfolio();
     return {
       paper: true,
       venue: this.venue.label,
       config: this.ledger.config,
       limits: this.ledger.limits,
-      portfolio: this.portfolio(),
+      portfolio,
+      pnl: pnlReport(all, portfolio.positions, this.nav.points, portfolio),
       proposals: [...live, ...done],
       market: this.market.state(),
       nav: this.nav.points.slice(-500),

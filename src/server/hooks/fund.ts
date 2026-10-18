@@ -6,6 +6,7 @@ import type { WorkerInfo } from '../../shared/protocol.js';
 import type { Ctx } from '../office/context.js';
 import { readBody, send } from '../http/util.js';
 import { LAB_ACTIONS, LAB_READS } from './fund-lab.js';
+import { RESEARCH_READS } from './fund-research.js';
 
 type Body = Record<string, unknown>;
 export type Answer = object | Promise<object>;
@@ -107,6 +108,7 @@ const READS: Record<string, (a: Ask) => Answer> = {
     return { events: ctx.fund.activity.list({ limit, proposalId: str(q.get('proposalId'), 20)?.toUpperCase(), symbol: list(q.get('symbol'))[0], kind: str(q.get('kind'), 20) as ActivityKind | undefined }) };
   },
   ...LAB_READS,
+  ...RESEARCH_READS,
 };
 
 /** After a fund action an agent took: on its role's record when it went through. */

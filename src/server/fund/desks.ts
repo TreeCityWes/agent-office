@@ -51,7 +51,7 @@ const START =
 /** How long the fund's news about a proposal gathers before its author hears it all at once. */
 const SETTLE_MS = 1500;
 
-function readJsonl<T>(file: string): T[] {
+export function readJsonl<T>(file: string): T[] {
   let text = '';
   try {
     text = readFileSync(file, 'utf8');
