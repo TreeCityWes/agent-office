@@ -125,8 +125,8 @@ export function agentConsole(kit: Kit, def: DeskDef): DeskView {
   return { def, group: g, laptopAnchor, seatAnchor, stage, chair: new THREE.Group(), vacancy, vacancyY: 0 };
 }
 
-/** The round briefing table, its chairs, and the display on a stand with the meeting's board and sign. */
-export function buildBriefing(kit: Kit): { board?: THREE.Mesh; sign?: THREE.Mesh } {
+/** The round briefing table, its chairs, and the display on a stand with the meeting's board and sign, `title` over it. */
+export function buildBriefing(kit: Kit, title = '🤝 Briefing room'): { board?: THREE.Mesh; sign?: THREE.Mesh } {
   const cp = kit.plan.council;
   if (!cp) return {};
   const { mats } = kit;
@@ -163,10 +163,10 @@ export function buildBriefing(kit: Kit): { board?: THREE.Mesh; sign?: THREE.Mesh
   sign.position.set(0, 0.92, 0.07);
   stand.add(mesh(box(1.3, 0.42, 0.06), mats.black, 0, 0.92, 0.02));
   stand.add(sign);
-  const title = textPlane('🤝 Briefing room', { bg: '#0f1a26', color: '#cfeeff', border: '#3a5a78', size: 56 });
-  title.scale.multiplyScalar(0.62);
-  title.position.set(0, 2.98, 0.06);
-  stand.add(title);
+  const heading = textPlane(title, { bg: '#0f1a26', color: '#cfeeff', border: '#3a5a78', size: 56 });
+  heading.scale.multiplyScalar(0.62);
+  heading.position.set(0, 2.98, 0.06);
+  stand.add(heading);
   stand.userData.interact = meeting;
   kit.group.add(stand);
   const [minX, maxX, minZ, maxZ] = boxFootprint(stand.position.x, stand.position.z, 2.6, 0.5, cp.rotY);

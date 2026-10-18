@@ -13,7 +13,7 @@ import type { Bounds, Obstacles, Pt, Rect } from '../nav.js';
  */
 
 /** The styles there's a builder for (the client's world/styles.ts): a map's `style` is one of them. */
-export const MAP_STYLES = ['castle', 'station'] as const;
+export const MAP_STYLES = ['castle', 'station', 'floor'] as const;
 export type MapStyle = (typeof MAP_STYLES)[number];
 
 /** The boards on the walls. */
@@ -74,6 +74,10 @@ export interface PropConfig {
   color?: string;
   /** A torch or a brazier that lights the room (a few at most: see MAX_LIGHTS). */
   light?: boolean;
+  /** What a sign says. */
+  text?: string;
+  /** What a trading floor's display shows (FLOOR_FEEDS in ./floor-props.ts). */
+  feed?: string;
 }
 
 /**
@@ -175,7 +179,7 @@ export interface MapConfig {
   description?: string;
   /** Another map's id to start from: everything given here replaces its part (objects are merged, lists replaced). */
   extends?: string;
-  /** Which builder puts it up: 'castle' or 'station' (see MAP_STYLES). */
+  /** Which builder puts it up: 'castle', 'station' or 'floor' (see MAP_STYLES). */
   style: string;
   /** The room: x from -width/2 to width/2, z from -length/2 to length/2, walls `height` high. */
   hall: { width: number; length: number; height: number };

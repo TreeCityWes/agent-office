@@ -2,9 +2,10 @@
 // an agent already at a desk or hires one for it, takes it back, hands a desk a task or a message, and
 // reads a role's memory. Only an admin staffs or talks to the desks; anyone may read.
 import { deskSign } from '../../../shared/fund/desks.js';
+import { departmentSeat } from '../../../shared/fund/floor.js';
 import { ROLE_BY_ID } from '../../../shared/fund/roles.js';
 import { cleanLabel } from '../../../shared/floorplan.js';
-import { nextFreeSeat } from '../../../shared/layout.js';
+import { DESK_BY_ID, deskBuilt, nextFreeSeat } from '../../../shared/layout.js';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
 import { isAgentEffort, isAgentProvider } from '../../../shared/protocol.js';
 import type { FundDeskClientMsg } from '../../../shared/protocol/fund.js';
@@ -49,11 +50,14 @@ export const fundDeskHandlers = {
     const effort = isAgentEffort(msg.effort) ? msg.effort : undefined;
     const hire = () => {
       if (desks.holder(role.id)) return ctx.warn(c, `The ${role.title} desk is already staffed`);
-      // The desk with the role's sign, when its last holder left it free; else the next free one.
+      // The desk with the role's sign, when its last holder left it free; else a free seat at its
+      // department's table, on a map that has one (the trading floor); else the next free one.
       const taken = (id: string) => floor.workers.deskOccupied(id);
+      // A back office seat only once it's built out, on whichever map (see deskBuilt).
+      const built = (id: string) => { const d = DESK_BY_ID.get(id); return !d || deskBuilt(d, floor.plan.wing); };
       const sign = cleanLabel(deskSign(role));
       const labels = floor.plan.state().labels;
-      const deskId = Object.keys(labels).find((id) => labels[id].text === sign && !taken(id)) ?? nextFreeSeat(taken, floor.plan.wing)?.id;
+      const deskId = Object.keys(labels).find((id) => labels[id].text === sign && !taken(id)) ?? departmentSeat(ctx.maps.plan(), role.department, (id) => taken(id) || !built(id)) ?? nextFreeSeat(taken, floor.plan.wing)?.id;
       if (!deskId) return ctx.warn(c, "There's no free desk on this floor");
       const w = floor.workers.spawn(deskId, c.peer.name, desks.brief(role), false, 'agent', msg.provider, model, effort, undefined, c.accountId);
       if (typeof w === 'string') return ctx.warn(c, w);

@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { CASTLE } from '../src/shared/maps/castle.js';
 import { STATION } from '../src/shared/maps/station.js';
+import { TRADING_FLOOR } from '../src/shared/maps/floor.js';
 import { DESK_BY_ID } from '../src/shared/layout.js';
 import { NavGrid, pathLength } from '../src/shared/nav.js';
 import { BUILTIN_MAPS, DEFAULT_DAIS, OFFICE_PLAN, checkCustomMaps, mapChoices, planMap, planOf, seatHereOn, type MapConfig } from '../src/shared/maps/index.js';
@@ -173,11 +174,12 @@ function mapJson(map: MapConfig, id: string, name: string): string {
 for (const [map, id, name] of [
   [CASTLE, 'my-castle', 'My castle'],
   [STATION, 'my-station', 'My station'],
+  [TRADING_FLOOR, 'my-floor', 'My trading floor'],
 ] as const) {
   test(`docs/maps/${map.id}.json is the ${map.name.toLowerCase()}, ready to copy into .agent-office/maps/ and change`, () => {
     const file = path.join(import.meta.dirname, '..', 'docs', 'maps', `${map.id}.json`);
     const want = mapJson(map, id, name);
-    // After changing the castle or the station: UPDATE_CASTLE_JSON=1 node --import tsx --test tests/maps.test.ts
+    // After changing the castle, the station or the trading floor: UPDATE_CASTLE_JSON=1 node --import tsx --test tests/maps.test.ts
     if (process.env.UPDATE_CASTLE_JSON) writeFileSync(file, want);
     assert.equal(readFileSync(file, 'utf8'), want, `docs/maps/${map.id}.json is out of date: write it again with UPDATE_CASTLE_JSON=1`);
     const [mine] = checkCustomMaps([{ file: `${map.id}.json`, json: JSON.parse(want) }]);
