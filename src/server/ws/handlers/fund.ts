@@ -2,6 +2,7 @@
 // office can look; only an admin approves, rejects, exits, changes the limits or settings, moves
 // capital or starts the fund over, and the fund itself checks every one of those again.
 import type { FundBrief, FundClientMsg } from '../../../shared/protocol.js';
+import type { FundDeskClientMsg } from '../../../shared/protocol/fund.js';
 import type { ActivityEvent, Actor } from '../../../shared/fund/types.js';
 import type { Fund, Result } from '../../fund/fund.js';
 import type { Ctx } from '../../office/context.js';
@@ -14,7 +15,7 @@ const watching = new WeakSet<Client>();
 let lastBrief = '';
 
 /** A person in the office, as the fund's records name them. */
-const actor = (c: Client): Actor => ({ kind: 'user', id: c.accountId ? `account:${c.accountId}` : `guest:${c.id}`, name: c.peer.name });
+export const actor = (c: Client): Actor => ({ kind: 'user', id: c.accountId ? `account:${c.accountId}` : `guest:${c.id}`, name: c.peer.name });
 
 export const fundBrief = (fund: Fund): FundBrief => {
   const s = fund.state();
@@ -44,7 +45,7 @@ export function fundActivity(ctx: Ctx, e: ActivityEvent) {
 }
 
 /** Only an admin runs the fund; anyone else is told so. */
-function admin(ctx: Ctx, c: Client): boolean {
+export function admin(ctx: Ctx, c: Client): boolean {
   if (!c.admin) ctx.warn(c, 'Only an admin can do that in the fund');
   return c.admin;
 }
@@ -103,4 +104,4 @@ export const fundHandlers = {
     if (!admin(ctx, c)) return;
     reply(ctx, c, ctx.fund.reset(actor(c)), '💼 The fund starts over; the old records were kept');
   },
-} satisfies HandlerMap<FundClientMsg>;
+} satisfies HandlerMap<Exclude<FundClientMsg, FundDeskClientMsg>>;

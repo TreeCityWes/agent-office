@@ -1,5 +1,7 @@
 // The paper-trading fund (docs/fund.md): what the 💼 Fund window shows, and what people do there.
+import type { DeskMemory } from '../fund/desks.js';
 import type { FundConfig, FundState } from '../fund/state.js';
+import type { AgentEffort, AgentProvider } from './agents.js';
 import type { ActivityEvent, ProposalInput, RiskLimits } from '../fund/types.js';
 
 /** What the top bar shows of the fund, sent to everyone: enough to know it wants someone. */
@@ -30,11 +32,29 @@ export type FundClientMsg =
   /** Capital paid in (positive) or taken out (negative), in USD. */
   | { t: 'fund.cash'; amount: number; note?: string }
   /** Start the fund over; its records are moved aside, not deleted. */
-  | { t: 'fund.reset' };
+  | { t: 'fund.reset' }
+  | FundDeskClientMsg;
+
+/** Staffing the fund's desks, and talking to them (ws/handlers/fund-desks.ts). */
+export type FundDeskClientMsg =
+  /**
+   * A desk staffed: an agent already at a desk (`workerId`) takes the role, or a new one is hired for it at
+   * a free desk on your floor (the one with the role's sign, if it's free), with the role's brief as its task.
+   */
+  | { t: 'fund.staff'; role: string; workerId?: string; provider?: AgentProvider; model?: string; effort?: AgentEffort }
+  /** The worker gives up its role (it stays at its desk). */
+  | { t: 'fund.release'; workerId: string }
+  /** A task for a desk, from a person: typed into its agent, and shown on its desk. */
+  | { t: 'fund.assign'; role: string; text: string }
+  | { t: 'fund.message'; to: string; text: string }
+  /** Send me a role's memory. */
+  | { t: 'fund.memory'; role: string };
 
 export type FundServerMsg =
   | { t: 'fund.brief'; brief: FundBrief }
   /** The whole fund, to whoever has the window open. */
   | { t: 'fund'; state: FundState }
   /** Activity log lines, oldest first: the latest when the window opens (`all`), then each as it happens. */
-  | { t: 'fund.activity'; events: ActivityEvent[]; all?: boolean };
+  | { t: 'fund.activity'; events: ActivityEvent[]; all?: boolean }
+  /** A role's memory, to whoever asked. */
+  | { t: 'fund.memory'; role: string; memory: DeskMemory };

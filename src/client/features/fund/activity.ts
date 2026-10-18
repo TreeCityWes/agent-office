@@ -1,5 +1,5 @@
-// The 💼 Fund window's activity log: every proposal, verdict, ruling, fill, exit and limit change, with
-// who did it, newest first. It's the fund's own record (activity.jsonl), not the chat.
+// The 💼 Fund window's activity log: every proposal, verdict, ruling, fill, exit and limit change, and
+// everything the desks said and did, with who did it, newest first. It's the fund's own record (activity.jsonl), not the chat.
 import type { FundState } from '../../../shared/fund/state';
 import type { ActivityEvent, ActivityKind } from '../../../shared/fund/types';
 import { h } from '../../ui/dom';
@@ -14,6 +14,12 @@ const KINDS: { id: 'all' | ActivityKind; label: string }[] = [
   { id: 'exit', label: 'Exits' },
   { id: 'limits', label: 'Limits' },
   { id: 'review', label: 'Reviews' },
+  { id: 'thesis', label: 'Theses' },
+  { id: 'observation', label: 'Observations' },
+  { id: 'status', label: 'Status' },
+  { id: 'assignment', label: 'Assignments' },
+  { id: 'message', label: 'Messages' },
+  { id: 'escalation', label: 'Escalations' },
   { id: 'system', label: 'The office' },
 ];
 

@@ -1,6 +1,7 @@
 // What the fund keeps and what it shows: its settings, the ledger journal's entries, market data
 // beyond prices, and the state the dashboards draw (see docs/fund.md). Types and checks only.
 import { checkAsset, cleanSymbol, DEFAULT_WATCHLIST } from './assets.js';
+import type { DesksState } from './desks.js';
 import type { Actor, Asset, Fill, PortfolioView, Proposal, Quote, RiskLimits } from './types.js';
 
 /** The fund's settings, changed only by a person (⚙️ in the 💼 Fund window). */
@@ -166,6 +167,8 @@ export interface FundState {
   market: MarketState;
   /** Recent NAV history. */
   nav: NavPoint[];
+  /** The agents holding the fund's roles, each role's record, and the latest messages between desks. */
+  desks: DesksState;
   /** Why the fund isn't trading: its journals don't check out. */
   halted?: string;
   /** What was put right when the journals were read. */

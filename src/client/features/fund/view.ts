@@ -22,6 +22,7 @@ export interface FundTab {
 
 export const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'agents', label: 'Agents' },
   { id: 'proposals', label: 'Proposals' },
   { id: 'risk', label: 'Risk' },
   { id: 'market', label: 'Market' },

@@ -18,6 +18,7 @@ import { Maps } from '../maps.js';
 import { OfficePrompts } from '../prompts.js';
 import { LeaveOnMerge } from '../leave-on-merge.js';
 import { Fund } from '../fund/fund.js';
+import { fundOffice } from '../fund/office.js';
 import { fundActivity, fundChanged } from '../ws/handlers/fund.js';
 import type { ServiceInfo, ServicesState } from '../../shared/protocol.js';
 import type { BuildingServices, Ctx, LateServices } from './context.js';
@@ -129,7 +130,7 @@ export function createServices(ctx: Ctx): BuildingServices {
 
   // The paper-trading fund (docs/fund.md): nothing on disk and no market data asked for until it's
   // used. The 💼 Fund window hears every change, and the top bar what wants someone.
-  const fund = new Fund({ dir: path.join(cfg.dataDir, 'fund'), onChange: () => fundChanged(ctx), onActivity: (e) => fundActivity(ctx, e) });
+  const fund = new Fund({ dir: path.join(cfg.dataDir, 'fund'), office: fundOffice(ctx), onChange: () => fundChanged(ctx), onActivity: (e) => fundActivity(ctx, e) });
   fund.start();
 
   return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, fund, limitsOf, pumpQueues };
