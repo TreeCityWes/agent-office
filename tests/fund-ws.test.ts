@@ -9,6 +9,7 @@ import type { Client } from '../src/server/office/client.js';
 import type { Ctx } from '../src/server/office/context.js';
 import { fundActivity, fundChanged, fundHandlers } from '../src/server/ws/handlers/fund.js';
 import { fundCommitteeHandlers } from '../src/server/ws/handlers/fund-committee.js';
+import { fundLabHandlers } from '../src/server/ws/handlers/fund-lab.js';
 import type { ServerMsg } from '../src/shared/protocol.js';
 
 const idea = { symbol: 'BTC', side: 'long' as const, sizeUsd: 50_000, stop: 95_000, target: 120_000, thesis: 'ETF inflows and a funding reset point higher.', confidence: 70, horizon: '2w', evidence: ['ETF inflows 5 days running'] };
@@ -109,5 +110,27 @@ test('only an admin calls or decides a committee from the window, and the fund s
   fundCommitteeHandlers['fund.decide'](ctx, boss, { t: 'fund.decide', id: 'C-9', vote: 'HOLD', summary: 'Nothing to decide here.' });
   assert.match(warned.get('boss')!.at(-1)!, /committee \(C-1…\)/);
   assert.equal(fund.state().committees.length, 0);
+  fund.stop();
+});
+
+test('the quant lab from the window: only an admin registers, moves or backtests a strategy', () => {
+  const { ctx, fund, boss, guest, warned, of } = office();
+  const strategy = { name: 'BTC trend', hypothesis: 'Bitcoin trends for months once a move gets going.', universe: ['BTC'], kind: 'trend' };
+  fundLabHandlers['fund.strategy'](ctx, guest, { t: 'fund.strategy', strategy });
+  assert.match(warned.get('guest')!.at(-1)!, /Only an admin/);
+  fundLabHandlers['fund.backtest'](ctx, guest, { t: 'fund.backtest', run: { strategyId: 'S-1' } });
+  assert.match(warned.get('guest')!.at(-1)!, /Only an admin/);
+  assert.equal(of('guest', 'toast').length, 0);
+  fundLabHandlers['fund.strategy'](ctx, boss, { t: 'fund.strategy', strategy });
+  assert.deepEqual(fund.state().strategies.map((s) => [s.id, s.author.name]), [['S-1', 'Wes']]);
+  fundLabHandlers['fund.strategy.stage'](ctx, guest, { t: 'fund.strategy.stage', id: 'S-1', stage: 'research' });
+  assert.match(warned.get('guest')!.at(-1)!, /Only an admin/);
+  fundLabHandlers['fund.strategy.stage'](ctx, boss, { t: 'fund.strategy.stage', id: 'S-1', stage: 'backtest' });
+  assert.match(warned.get('boss')!.at(-1)!, /goes to Research next/);
+  fundLabHandlers['fund.strategy.stage'](ctx, boss, { t: 'fund.strategy.stage', id: 'S-1', stage: 'research' });
+  assert.deepEqual(
+    of('boss', 'toast').map((m) => (m as { text: string }).text),
+    ['🧪 Registered S-1', '🧪 S-1 is at Research'],
+  );
   fund.stop();
 });

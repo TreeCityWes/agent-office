@@ -76,6 +76,7 @@ function card(p: Proposal, deps: TabDeps, cmt?: Committee): HTMLElement {
       h('span', { class: `fd-side ${p.side}` }, p.side.toUpperCase()),
       h('span.fd-sym', {}, p.symbol),
       h('span.num', {}, usd(p.sizeUsd)),
+      p.strategyId ? h('span.fd-strat-tag', { title: 'Proposed under this quant lab strategy, and only because its signal backs it' }, `🧪 ${p.strategyId}`) : null,
       v && v.decision !== 'approved' ? h('span', { class: `fd-verdict ${v.decision}` }, v.decision === 'resized' ? `risk: ${usd(v.approvedUsd)}` : 'risk: rejected') : null,
       h('span.grow'),
       h('span', { class: `fd-stage ${p.stage}` }, STAGE_LABEL[p.stage]),

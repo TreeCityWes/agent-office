@@ -58,7 +58,7 @@ export const FUND_TOOLS = [
     route: 'GET activity',
     title: 'Fund activity',
     description: "The fund's audit log, newest last: proposals, risk verdicts, rulings, fills, exits, theses, observations, messages, escalations. Narrow it to a proposal, a symbol or a kind.",
-    inputSchema: schema({ proposalId: ID, symbol: str('One symbol.'), kind: str('One kind: proposal, risk, ruling, fill, exit, thesis, observation, status, assignment, message, escalation, committee, review, system.'), limit: { type: 'integer', minimum: 1, maximum: 200 } }),
+    inputSchema: schema({ proposalId: ID, symbol: str('One symbol.'), kind: str('One kind: proposal, risk, ruling, fill, exit, thesis, observation, status, assignment, message, escalation, committee, strategy, backtest, review, system.'), limit: { type: 'integer', minimum: 1, maximum: 200 } }),
     annotations: read,
   },
   {
@@ -162,6 +162,7 @@ export const FUND_TOOLS = [
       horizon: str('How long to hold it: 3d, 2w, 3m.'),
       evidence: { type: 'array', items: { type: 'string' }, description: 'The facts it rests on, each with its source.' },
       dissent: str('The strongest case against.'),
+      strategyId: str('The quant lab strategy it follows, like S-2: it must be on paper, and the trade must go its signal’s way.'),
       idea: { type: 'boolean', description: 'File it as an idea for research, not a trade yet.' },
     }),
     annotations: act,
@@ -248,6 +249,83 @@ export const FUND_TOOLS = [
     inputSchema: schema({ id: str('The committee, like C-3.'), vote: { type: 'string', enum: ['BUY', 'HOLD', 'SELL'] }, summary: str('What the committee found, the dissent, and why you decide this way.') }, ['id', 'vote', 'summary']),
     annotations: act,
   },
+  {
+    name: 'fund_strategies',
+    route: 'GET strategies',
+    title: 'Quant lab strategies',
+    description:
+      "The quant lab's strategies: each one's stage (idea → research → backtest → validation → paper → approved, or retired), owner, universe, rules, latest backtest, whether it clears the validation bar, its signal while on paper and its record of paper trades. " +
+      'Also the kinds of strategy the lab runs, with their params, and the validation bar. With an id, the whole strategy, the bar’s checks and its backtests.',
+    inputSchema: schema({ id: str('A strategy, like S-2.'), stage: str('Only this stage: idea, research, backtest, validation, paper, approved or retired.') }),
+    annotations: read,
+  },
+  {
+    name: 'fund_backtests',
+    route: 'GET backtests',
+    title: 'Backtests',
+    description:
+      "The lab's backtests, newest first: the rules and universe tested, the period and costs, Sharpe, Sortino, CAGR, max drawdown, win rate, profit factor, turnover and exposure, in sample and out of sample, against buy-and-hold. " +
+      'With an id, its equity curve, its trades and exactly which prices it ran on (source and hash).',
+    inputSchema: schema({ id: str('A backtest, like B-7.'), strategyId: str('Only this strategy’s, like S-2.') }),
+    annotations: read,
+  },
+  {
+    name: 'fund_history',
+    route: 'GET history',
+    title: 'Price history',
+    description: "Daily closes for one asset, oldest first, from the fund's sources (Coinbase, Yahoo Finance, or simulated in the mock market), with the source and a hash of the data: the same prices the lab's backtests run on.",
+    inputSchema: schema({ symbol: str('Like BTC or SPY.'), years: num('How far back, 0.25 to 10 (1 by default).') }, ['symbol']),
+    annotations: read,
+  },
+  {
+    name: 'fund_backtest',
+    route: 'POST backtest',
+    title: 'Run a backtest',
+    description:
+      "Backtests a strategy's rules (strategyId), or rules given here, on daily closes with no look-ahead: positions are decided at each close and held to the next, costs (never less than the paper venue's fees and slippage) are charged on every change, assets are equally weighted, " +
+      'and the last 30% of the period is held out of sample. It goes on the record. Kinds: trend {fast, slow}, momentum {lookback, threshold}, mean-reversion {window, entry, exit}, breakout {entry, exit}, buy-hold.',
+    inputSchema: schema({
+      strategyId: str('A registered strategy, like S-2: its rules and universe.'),
+      kind: { type: 'string', enum: ['trend', 'momentum', 'mean-reversion', 'breakout', 'buy-hold'] },
+      params: { type: 'object', additionalProperties: { type: 'number' }, description: 'The kind’s params; any left out take their defaults (fund_strategies lists them).' },
+      universe: { type: 'array', items: { type: 'string' }, description: 'The symbols, like ["BTC","ETH"], equally weighted.' },
+      short: { type: 'boolean', description: 'Let it go short where it would sell.' },
+      volTargetPct: num('Size each position to this annualized volatility, in %.'),
+      years: num('Years of history, 1 to 15 (5 by default).'),
+      costBps: num('Costs per trade in basis points, when higher than the venue’s.'),
+    }),
+    annotations: act,
+  },
+  {
+    name: 'fund_strategy',
+    route: 'POST strategy',
+    title: 'Register or edit a strategy',
+    description:
+      'Registers a strategy with the quant lab, where it starts as an idea, or edits one by its id (what you leave out stays as it was). Its rules may change until it goes on paper; changing them in validation sends it back to backtest. ' +
+      'Its owner is the desk told when its signal changes.',
+    inputSchema: schema({
+      id: str('A strategy to edit, like S-2.'),
+      name: str('What to call it.'),
+      hypothesis: str('What it bets on, and why that should pay.'),
+      universe: { type: 'array', items: { type: 'string' }, description: 'The symbols it trades, like ["BTC","ETH"].' },
+      kind: { type: 'string', enum: ['trend', 'momentum', 'mean-reversion', 'breakout', 'buy-hold'] },
+      params: { type: 'object', additionalProperties: { type: 'number' }, description: 'The kind’s params.' },
+      short: { type: 'boolean', description: 'May it go short?' },
+      volTargetPct: num('Size each position to this annualized volatility, in %.'),
+      owner: str('The role that looks after it (yours by default), like quant or strategy.'),
+    }),
+    annotations: act,
+  },
+  {
+    name: 'fund_strategy_stage',
+    route: 'POST strategy-stage',
+    title: 'Move a strategy',
+    description:
+      'Moves a strategy one step on, back to research, or to retired, when its gate allows. Backtest needs a backtest of its rules; validation, one over enough years; paper, a backtest of the current rules that clears the validation bar, moved by a desk that didn’t write it; ' +
+      'approved, a person, after its days on paper. Its owner, the CIO or PM retires it.',
+    inputSchema: schema({ id: str('The strategy, like S-2.'), stage: { type: 'string', enum: ['research', 'backtest', 'validation', 'paper', 'retired'] }, note: str('Why.') }, ['id', 'stage']),
+    annotations: act,
+  },
 ];
 
 const BY_NAME = new Map(FUND_TOOLS.map((t) => [t.name, t]));
@@ -304,7 +382,7 @@ export async function runFundTool(name, args, io) {
 /** What the agent-office MCP server adds to its instructions about the fund. */
 export const FUND_INSTRUCTIONS =
   " If you hold a desk at the office's paper-trading fund, its fund_* tools are how you read its book, market data and proposals, keep your memory (fund_thesis, fund_observe), " +
-  'report your status, message the other desks, propose trades and vote on its investment committee (fund_ballot); the office-fund command does the same from a shell. Its risk engine is code, and a person approves every trade.';
+  'report your status, message the other desks, propose trades, vote on its investment committee (fund_ballot) and backtest strategies (fund_backtest); the office-fund command does the same from a shell. Its risk engine is code, and a person approves every trade.';
 
 const USAGE = `Usage:
   office-fund <tool> ['<json>']      call one of the fund's tools, its arguments as JSON (or on stdin)
@@ -316,7 +394,8 @@ For example:
   office-fund portfolio
   office-fund quotes '{"symbols":["BTC","NVDA"]}'
   office-fund status '{"status":"researching","note":"ETF flows"}'
-  office-fund message '{"to":"cio","text":"Done: see my thesis"}'`;
+  office-fund message '{"to":"cio","text":"Done: see my thesis"}'
+  office-fund backtest '{"kind":"trend","params":{"fast":20,"slow":100},"universe":["BTC","ETH"]}'`;
 
 function readStdin(stdin) {
   return new Promise((resolve, reject) => {

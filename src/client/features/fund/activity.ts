@@ -11,6 +11,8 @@ const KINDS: { id: 'all' | ActivityKind; label: string }[] = [
   { id: 'risk', label: 'Risk' },
   { id: 'ruling', label: 'Rulings' },
   { id: 'committee', label: 'Committees' },
+  { id: 'strategy', label: 'Strategies' },
+  { id: 'backtest', label: 'Backtests' },
   { id: 'fill', label: 'Fills' },
   { id: 'exit', label: 'Exits' },
   { id: 'limits', label: 'Limits' },

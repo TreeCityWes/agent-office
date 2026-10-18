@@ -1,6 +1,6 @@
 // The 💼 Fund window: a trading terminal over the office. A ticker along the top (NAV, the day, the
-// drawdown, the market data), then a tab each for the overview, the agents at the desks, proposals, the committee, risk,
-// market, activity and settings. It watches the fund while it's open and lets go when it closes.
+// drawdown, the market data), then a tab each for the overview, the agents at the desks, proposals, the committee, the
+// quant lab's strategies and backtests, risk, market, activity and settings. It watches the fund while it's open and lets go when it closes.
 import './ui.css';
 import type { ClientMsg } from '../../../shared/protocol';
 import { pct, usd } from '../../../shared/fund/format';
@@ -8,12 +8,14 @@ import { store } from '../../state';
 import { h, openModal, type Modal } from '../../ui/dom';
 import { activityTab } from './activity';
 import { agentsTab } from './agents';
+import { backtestsTab } from './backtests';
 import { committeeTab } from './committee';
 import { marketTab } from './market';
 import { overviewTab } from './overview';
 import { proposalsTab } from './proposals';
 import { riskTab } from './risk';
 import { settingsTab } from './settings';
+import { strategiesTab } from './strategies';
 import { change, money, TABS, type FundTab, type TabDeps, type TabId } from './view';
 
 /** The tab you had open last, for the next time the window opens. */
@@ -44,6 +46,8 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
     agents: () => agentsTab(deps),
     committee: () => committeeTab(deps),
     proposals: () => proposalsTab(deps),
+    strategies: () => strategiesTab(deps),
+    backtests: () => backtestsTab(deps),
     risk: () => riskTab(deps),
     market: () => marketTab(),
     activity: () => activityTab(),
@@ -52,13 +56,15 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
   let current: TabId = lastTab;
 
   function show(id: TabId) {
+    // A tab you turn to starts at its top; the body scrolls for all of them.
+    if (id !== current) body.scrollTop = 0;
     current = lastTab = id;
     for (const b of tabBar.querySelectorAll<HTMLElement>('button')) b.setAttribute('aria-selected', String(b.dataset.tab === id));
     render();
   }
 
   tabBar.append(
-    ...TABS.map((t, i) => h('button', { type: 'button', role: 'tab', 'data-tab': t.id, title: `${t.label} (${i + 1})`, onclick: () => show(t.id) }, h('span.fd-key', {}, String(i + 1)), t.label, h('span.fd-count'))),
+    ...TABS.map((t, i) => h('button', { type: 'button', role: 'tab', 'data-tab': t.id, title: `${t.label} (${(i + 1) % 10})`, onclick: () => show(t.id) }, h('span.fd-key', {}, String((i + 1) % 10)), t.label, h('span.fd-count'))),
   );
 
   function render() {
@@ -107,11 +113,11 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
     tab.update(s, store.fundActivity);
   }
 
-  // 1–8 turn to a tab, unless you're typing.
+  // 1–9 and 0 turn to a tab, unless you're typing.
   const onKey = (e: KeyboardEvent) => {
     const t = e.target as HTMLElement | null;
     if (e.ctrlKey || e.metaKey || e.altKey || (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-    const i = Number(e.key) - 1;
+    const i = e.key === '0' ? 9 : Number(e.key) - 1;
     if (Number.isInteger(i) && TABS[i]) show(TABS[i].id);
   };
   window.addEventListener('keydown', onKey);

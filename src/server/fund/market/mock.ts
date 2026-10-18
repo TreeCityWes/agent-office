@@ -6,13 +6,13 @@ import type { AssetClass, Quote } from '../../../shared/fund/types.js';
 import type { Signal } from '../../../shared/fund/state.js';
 import type { Listing, PriceAdapter, SignalAdapter } from './types.js';
 
-const BASE: Record<string, number> = {
+export const BASE: Record<string, number> = {
   BTC: 100_000, ETH: 4_000, SOL: 200, XRP: 2.5, DOGE: 0.25, LINK: 20, AVAX: 35,
   SPY: 600, QQQ: 520, IWM: 220, AAPL: 230, MSFT: 450, NVDA: 150, AMZN: 200, TSLA: 300, JPM: 240,
   XOM: 115, COIN: 280, MSTR: 350, TLT: 90, GLD: 280, USO: 75, IBIT: 55,
 };
 /** Yearly volatility by class. */
-const VOL: Record<AssetClass, number> = { crypto: 0.6, equity: 0.35, etf: 0.18, index: 0.18, rates: 0.12, commodity: 0.25, fx: 0.08 };
+export const VOL: Record<AssetClass, number> = { crypto: 0.6, equity: 0.35, etf: 0.18, index: 0.18, rates: 0.12, commodity: 0.25, fx: 0.08 };
 /** Value traded per day, USD. */
 const VOLUME: Record<AssetClass, number> = { crypto: 1e9, equity: 2e9, etf: 5e9, index: 5e9, rates: 1e9, commodity: 1e9, fx: 5e9 };
 const SPEED = 60;
