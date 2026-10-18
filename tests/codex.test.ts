@@ -53,13 +53,14 @@ test('generates one stable CLI hook override per supported event', () => {
     assert.match(args[i * 2 + 1], new RegExp(`^hooks\\.${CODEX_HOOK_EVENTS[i]}=\\[\\{hooks=`));
     assert.match(args[i * 2 + 1], /type="command"/);
     assert.match(args[i * 2 + 1], /timeout=3/);
-    assert.match(args[i * 2 + 1], /agent-office-codex-hook\.cjs/);
+    assert.match(args[i * 2 + 1], /agent-office-codex-hook/);
   }
-  // Codex runs a hook with `sh -lc` elsewhere and `cmd.exe /C` on Windows, which has no single quotes.
+  // Codex runs a hook with `sh -lc` elsewhere. On Windows its shell may be PowerShell, cmd.exe or Git
+  // Bash, so the command is the launcher's bare name (written by writeCodexHook) and the event.
   const posix = hookCommand(codexHookArgs("/tmp/it's here/hook.cjs", 'linux'), 'Stop');
   assert.equal(posix, `'${process.execPath}' '/tmp/it'"'"'s here/hook.cjs' 'Stop'`);
   const windows = hookCommand(codexHookArgs('C:\\Office Data\\hook.cjs', 'win32'), 'Stop');
-  assert.equal(windows, `"${process.execPath}" "C:\\Office Data\\hook.cjs" "Stop"`);
+  assert.equal(windows, 'agent-office-codex-hook Stop');
 });
 
 test('a worker\'s own model and effort go on Codex\'s command line, in place of an office-wide model', () => {
@@ -98,12 +99,16 @@ test('writes a mode-restricted helper that forwards paths without reading transc
     assert.match(source, /MAX = 64 \* 1024/);
     assert.match(source, /AGENT_OFFICE_HOOK_TOKEN/);
     assert.doesNotMatch(source, /readFile|readSync|createReadStream/);
+    // On Windows, its launchers go in the office's commands folder, which is on every worker's PATH.
+    writeCodexHook(dir, 'win32');
+    assert.equal(readFileSync(path.join(dir, 'bin', 'agent-office-codex-hook.cmd'), 'utf8'), `@"${process.execPath}" "${file}" %*\r\n`);
+    assert.match(readFileSync(path.join(dir, 'bin', 'agent-office-codex-hook'), 'utf8'), /^#!\/bin\/sh\nexec '.+' '.+agent-office-codex-hook\.cjs' "\$@"\n$/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('the hook command runs in the shell Codex runs it in, and reaches the office', async () => {
+test('the hook command runs in each shell Codex may run it in, and reaches the office', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'agent office codex '));
   const received: string[] = [];
   const server = createServer((req, res) => {
@@ -117,29 +122,40 @@ test('the hook command runs in the shell Codex runs it in, and reaches the offic
     const address = server.address();
     assert.ok(address && typeof address === 'object');
     const line = hookCommand(codexHookArgs(file), 'Stop');
-    // As Codex does it: `%COMSPEC% /C "<command>"`, passed through verbatim, on Windows; `sh -lc <command>` elsewhere.
-    const windows = process.platform === 'win32';
-    const child = spawn(windows ? process.env.ComSpec ?? 'cmd.exe' : '/bin/sh', windows ? ['/C', `"${line}"`] : ['-lc', line], {
-      env: {
-        ...process.env,
-        AGENT_OFFICE_HOOK_URL: `http://127.0.0.1:${address.port}`,
-        AGENT_OFFICE_HOOK_TOKEN: 'hook-token',
-        AGENT_OFFICE_WORKER_ID: 'worker-1',
-      },
-      windowsVerbatimArguments: true,
-    });
-    const { code, stdout, stderr } = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', (chunk) => { stdout += chunk; });
-      child.stderr.on('data', (chunk) => { stderr += chunk; });
-      child.on('error', reject);
-      child.on('close', (code) => resolve({ code, stdout, stderr }));
-      child.stdin.end(JSON.stringify({ session_id: 'thread-1', turn_id: 'turn-1' }));
-    });
-    assert.equal(code, 0, stderr);
-    assert.equal(stdout.trim(), '{}');
-    assert.deepEqual(received, ['/hooks/codex?worker=worker-1&event=Stop']);
+    // Codex runs a hook in its session's shell. On Windows that's PowerShell (`-NoProfile -Command
+    // <command>`) or cmd.exe (`/c "<command>"`, passed verbatim); elsewhere `sh -lc <command>`. Like
+    // every worker, it has the office's commands folder first on its PATH.
+    const shells: [string, string[], boolean][] =
+      process.platform === 'win32'
+        ? [
+            [process.env.ComSpec ?? 'cmd.exe', ['/c', `"${line}"`], true],
+            ['powershell.exe', ['-NoProfile', '-Command', line], false],
+          ]
+        : [['/bin/sh', ['-lc', line], false]];
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      AGENT_OFFICE_HOOK_URL: `http://127.0.0.1:${address.port}`,
+      AGENT_OFFICE_HOOK_TOKEN: 'hook-token',
+      AGENT_OFFICE_WORKER_ID: 'worker-1',
+    };
+    const pathKey = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH';
+    env[pathKey] = [path.join(dir, 'bin'), env[pathKey]].filter(Boolean).join(path.delimiter);
+    for (const [shell, args, verbatim] of shells) {
+      received.length = 0;
+      const child = spawn(shell, args, { env, windowsVerbatimArguments: verbatim });
+      const { code, stdout, stderr } = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (chunk) => { stdout += chunk; });
+        child.stderr.on('data', (chunk) => { stderr += chunk; });
+        child.on('error', reject);
+        child.on('close', (code) => resolve({ code, stdout, stderr }));
+        child.stdin.end(JSON.stringify({ session_id: 'thread-1', turn_id: 'turn-1' }));
+      });
+      assert.equal(code, 0, `${shell}: ${stderr}`);
+      assert.equal(stdout.trim(), '{}', shell);
+      assert.deepEqual(received, ['/hooks/codex?worker=worker-1&event=Stop'], shell);
+    }
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     rmSync(dir, { recursive: true, force: true });

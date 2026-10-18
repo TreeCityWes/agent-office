@@ -82,24 +82,26 @@ export function validateCodexHook(event: string, payload: unknown): boolean {
   return !!normalizeCodexHook(event, payload);
 }
 
-/**
- * Quote one word of a hook command for the shell Codex runs it in: `sh -lc` elsewhere, but
- * `cmd.exe /C "…"` on Windows, where single quotes aren't quotes at all (and a Windows path can't
- * hold a double quote).
- */
-function shellQuote(value: string, platform: NodeJS.Platform): string {
-  if (platform === 'win32') return `"${value}"`;
+/** What Codex's hooks run on Windows: a launcher in the office's commands folder (see writeCodexHook). */
+export const CODEX_HOOK_LAUNCHER = 'agent-office-codex-hook';
+
+/** Quote one word for `sh`. */
+function shq(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
 }
 
 /**
  * Build the CLI config overrides for all lifecycle hooks. The command is encoded as a TOML basic
- * string so paths containing spaces remain valid; the command itself is shell-quoted.
+ * string so paths containing spaces remain valid. Codex runs it in its session's shell: `sh -lc`
+ * outside Windows, where it's the helper run by the office's node, each word quoted. On Windows the
+ * shell is PowerShell, cmd.exe or Git Bash, which share no way of quoting a path with a space in it
+ * (PowerShell won't run a quoted one without `&`, and cmd.exe has no `&` but as "and then"), so it's
+ * the launcher's bare name, which all three find on the worker's PATH, and the event.
  */
 export function codexHookArgs(hookPath: string, platform: NodeJS.Platform = process.platform): string[] {
   const args: string[] = [];
   for (const event of CODEX_HOOK_EVENTS) {
-    const command = [process.execPath, hookPath, event].map((part) => shellQuote(part, platform)).join(' ');
+    const command = platform === 'win32' ? `${CODEX_HOOK_LAUNCHER} ${event}` : [process.execPath, hookPath, event].map(shq).join(' ');
     const config = `hooks.${event}=[{hooks=[{type="command",command=${JSON.stringify(command)},timeout=3}]}]`;
     args.push('-c', config);
   }
@@ -123,12 +125,24 @@ export function codexModelArgs(args: string[], model?: string, effort?: AgentEff
   return out;
 }
 
-/** Write the stable, self-contained helper invoked by Codex's native command hooks. */
-export function writeCodexHook(dataDir: string): string {
+/**
+ * Write the stable, self-contained helper invoked by Codex's native command hooks. On Windows, also
+ * its launcher in the office's commands folder, bin/, which every worker has first on its PATH (see
+ * writeOfficeCommands in workers/process.ts): a .cmd that PowerShell and cmd.exe find by PATHEXT, and
+ * an sh script for Git Bash.
+ */
+export function writeCodexHook(dataDir: string, platform: NodeJS.Platform = process.platform): string {
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const file = path.join(dataDir, 'agent-office-codex-hook.cjs');
   writeFileSync(file, CODEX_HOOK_SOURCE, { mode: 0o600 });
   chmodSync(file, 0o600);
+  if (platform === 'win32') {
+    const bin = path.join(dataDir, 'bin');
+    mkdirSync(bin, { recursive: true, mode: 0o700 });
+    const launcher = path.join(bin, CODEX_HOOK_LAUNCHER);
+    writeFileSync(`${launcher}.cmd`, `@"${process.execPath}" "${file}" %*\r\n`);
+    writeFileSync(launcher, `#!/bin/sh\nexec ${shq(process.execPath)} ${shq(file)} "$@"\n`, { mode: 0o700 });
+  }
   return file;
 }
 
