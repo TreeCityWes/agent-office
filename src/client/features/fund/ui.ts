@@ -1,5 +1,5 @@
 // The 💼 Fund window: a trading terminal over the office. A ticker along the top (NAV, the day, the
-// drawdown, the market data), then a tab each for the overview, the agents at the desks, proposals, risk,
+// drawdown, the market data), then a tab each for the overview, the agents at the desks, proposals, the committee, risk,
 // market, activity and settings. It watches the fund while it's open and lets go when it closes.
 import './ui.css';
 import type { ClientMsg } from '../../../shared/protocol';
@@ -8,6 +8,7 @@ import { store } from '../../state';
 import { h, openModal, type Modal } from '../../ui/dom';
 import { activityTab } from './activity';
 import { agentsTab } from './agents';
+import { committeeTab } from './committee';
 import { marketTab } from './market';
 import { overviewTab } from './overview';
 import { proposalsTab } from './proposals';
@@ -41,6 +42,7 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
   const makers: Record<TabId, () => FundTab> = {
     overview: () => overviewTab(deps),
     agents: () => agentsTab(deps),
+    committee: () => committeeTab(deps),
     proposals: () => proposalsTab(deps),
     risk: () => riskTab(deps),
     market: () => marketTab(),
@@ -89,6 +91,10 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
     const asking = s.desks.desks.filter((d) => d.process === 'needs_input').length;
     const deskCount = tabBar.querySelector<HTMLElement>('[data-tab="agents"] .fd-count');
     if (deskCount) deskCount.textContent = asking ? String(asking) : '';
+    // Committees whose ballots are open and wait on a person's decision.
+    const deciding = s.committees.filter((c) => c.status === 'open' && !c.chair).length;
+    const cmtCount = tabBar.querySelector<HTMLElement>('[data-tab="committee"] .fd-count');
+    if (cmtCount) cmtCount.textContent = deciding ? String(deciding) : '';
 
     let tab = made.get(current);
     if (!tab) {
@@ -101,7 +107,7 @@ export function openFund(send: (msg: ClientMsg) => void, onClose: () => void): M
     tab.update(s, store.fundActivity);
   }
 
-  // 1–7 turn to a tab, unless you're typing.
+  // 1–8 turn to a tab, unless you're typing.
   const onKey = (e: KeyboardEvent) => {
     const t = e.target as HTMLElement | null;
     if (e.ctrlKey || e.metaKey || e.altKey || (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;

@@ -10,6 +10,7 @@ import { checkConfig, type FundState } from '../../shared/fund/state.js';
 import type { ActivityEvent, Actor, Asset, NavMarks, PortfolioView, PostTradeReview, Proposal, ProposalStage, RiskVerdict, Side } from '../../shared/fund/types.js';
 import { MarketData, type MarketOptions } from './market/index.js';
 import { ActivityLog, Ledger, NavHistory, ProposalRecords } from './records.js';
+import { Committees } from './committee.js';
 import { Desks, type FundOffice } from './desks.js';
 import { closePosition as runClose, exitProposal as runExit } from './exits.js';
 import { PaperVenue, type ExecutionVenue } from './venue.js';
@@ -53,6 +54,7 @@ export class Fund {
   nav!: NavHistory;
   activity!: ActivityLog;
   desks!: Desks;
+  committees!: Committees;
   readonly market: MarketData;
   readonly venue: ExecutionVenue;
   readonly now: () => number;
@@ -80,6 +82,8 @@ export class Fund {
     this.desks?.stop();
     this.desks = new Desks(this, this.opts.dir, this.opts.office);
     this.desks.adopt(staffed);
+    this.committees?.stop();
+    this.committees = new Committees(this, this.opts.dir);
     this.activity = new ActivityLog(this.opts.dir, (e) => {
       this.opts.onActivity?.(e);
       this.desks.heard(e);
@@ -110,6 +114,7 @@ export class Fund {
   stop() {
     this.market.stop();
     this.desks.stop();
+    this.committees.stop();
     clearInterval(this.timer);
     clearTimeout(this.changeTimer);
   }
@@ -118,7 +123,7 @@ export class Fund {
 
   /** Why the fund isn't trading, when one of its journals doesn't check out. */
   halted(): string | undefined {
-    for (const [name, r] of [['ledger', this.ledger], ['proposals', this.proposals], ['NAV', this.nav], ['activity', this.activity]] as const)
+    for (const [name, r] of [['ledger', this.ledger], ['proposals', this.proposals], ['NAV', this.nav], ['activity', this.activity], ['committees', this.committees]] as const)
       if (r.problem) return `The fund's ${name} journal doesn't check out (${r.problem}), so trading has stopped. See docs/fund.md#audit.`;
     return undefined;
   }
@@ -156,8 +161,9 @@ export class Fund {
       market: this.market.state(),
       nav: this.nav.points.slice(-500),
       desks: this.desks.state(),
+      committees: this.committees.state(),
       ...(halted ? { halted } : {}),
-      notes: [this.ledger, this.proposals, this.nav, this.activity].flatMap((r) => (r.repaired ? [r.repaired] : [])),
+      notes: [this.ledger, this.proposals, this.nav, this.activity, this.committees].flatMap((r) => (r.repaired ? [r.repaired] : [])),
     };
   }
 
@@ -302,12 +308,30 @@ export class Fund {
       if (!this.can(by, 'rule')) return this.refuse(by, 'rule on proposals');
       if (found.stage !== 'cio_review') return { error: `${found.id} is ${STAGE_LABEL[found.stage]}: only a proposal at CIO review is ruled on` };
       if (by.kind === 'agent' && found.author.id === by.id) return { error: `You proposed ${found.id}: someone else rules on it` };
+      const unheard = by.kind === 'agent' ? this.needsCommittee(found) : undefined;
+      if (unheard) return { error: unheard };
       const ruling = { by, decision, at: this.now(), ...(note ? { note: note.slice(0, 500) } : {}) };
       const p = { ...this.move(found, decision === 'approve' ? 'user_approval' : 'rejected', by, note), cio: ruling };
       this.proposals.put(p);
       this.log('ruling', by, `${decision === 'approve' ? 'Backed' : 'Turned down'} ${p.id} (${p.side} ${p.symbol})${note ? `: ${note.slice(0, 200)}` : ''}`, { proposalId: p.id, symbol: p.symbol, level: decision === 'approve' ? 'good' : 'bad' });
       return { ok: true, proposal: p };
     });
+  }
+
+  /** Why a proposal this big needs an investment committee's decision before the CIO rules, while it has none. */
+  needsCommittee(p: Proposal): string | undefined {
+    const over = this.ledger.config.committeeOverPct;
+    const nav = this.portfolio().nav;
+    const share = nav > 0 ? ((p.risk?.approvedUsd ?? p.sizeUsd) / nav) * 100 : 0;
+    if (!over || share <= over || this.committees.decidedFor(p.id)) return undefined;
+    return `${p.id} is ${share.toFixed(1)}% of NAV, over the fund's ${over}%: it needs an investment committee's decision before the CIO rules (fund_committee with proposalId ${p.id})`;
+  }
+
+  beforeRuling(p: Proposal): string {
+    const why = this.needsCommittee(p);
+    return why ? `
+
+${why}.` : '';
   }
 
   /**

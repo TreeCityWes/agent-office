@@ -2,6 +2,7 @@
 // the buttons to decide, then open trades, ideas and what's finished. A person can put a trade forward
 // here too; it goes through risk like an agent's.
 import { assetTable } from '../../../shared/fund/assets';
+import { COMMITTEE_STATUS_LABEL, tally, type Committee } from '../../../shared/fund/committee';
 import { pct, price, usd } from '../../../shared/fund/format';
 import { STAGE_LABEL } from '../../../shared/fund/proposals';
 import { ROLE_BY_ID } from '../../../shared/fund/roles';
@@ -28,13 +29,13 @@ export function proposalsTab(deps: TabDeps): FundTab {
 
   function update(s: FundState) {
     form.update(s);
-    const sig = `${deps.admin()}|${s.proposals.map((p) => `${p.id}:${p.stage}:${p.updatedAt}`).join(',')}`;
+    const sig = `${deps.admin()}|${s.proposals.map((p) => `${p.id}:${p.stage}:${p.updatedAt}`).join(',')}|${s.committees.map((c) => `${c.id}:${c.status}`).join(',')}`;
     if (sig !== signature) {
       signature = sig;
       const groups = GROUPS.map((g) => ({ ...g, items: s.proposals.filter((p) => g.stages.includes(p.stage)) })).filter((g) => g.items.length);
       list.replaceChildren(
         ...(groups.length
-          ? groups.map((g) => section(`${g.title} (${g.items.length})`, ...g.items.map((p) => card(p, deps))))
+          ? groups.map((g) => section(`${g.title} (${g.items.length})`, ...g.items.map((p) => card(p, deps, s.committees.find((c) => c.proposalId === p.id)))))
           : [h('div.fd-empty', {}, 'No proposals yet. Agents put trades forward from their desks; you can propose one above.')]),
       );
     }
@@ -51,7 +52,7 @@ export function proposalsTab(deps: TabDeps): FundTab {
 }
 
 /** One proposal: what it is, why, what risk said, and what can be done with it now. */
-function card(p: Proposal, deps: TabDeps): HTMLElement {
+function card(p: Proposal, deps: TabDeps, cmt?: Committee): HTMLElement {
   const v = p.risk;
   const pending = p.stage === 'user_approval' || p.stage === 'cio_review';
   const note = h('input.fd-input', { type: 'text', placeholder: 'A note for the record (optional)', maxlength: '500' }) as HTMLInputElement;
@@ -85,6 +86,7 @@ function card(p: Proposal, deps: TabDeps): HTMLElement {
     p.evidence.length ? h('ul.fd-evidence', {}, ...p.evidence.map((e) => h('li', {}, e))) : null,
     p.dissent ? h('div.fd-line.dissent', {}, h('b', {}, 'Against '), p.dissent) : null,
     v ? riskBlock(p) : null,
+    cmt ? committeeLine(cmt) : null,
     p.cio ? h('div.fd-line', {}, h('b', {}, `CIO ${p.cio.decision === 'approve' ? 'backed it' : 'turned it down'} `), `${p.cio.by.name}${p.cio.note ? `: ${p.cio.note}` : ''}`) : null,
     p.user ? h('div.fd-line', {}, h('b', {}, `${p.user.decision === 'approve' ? 'Approved' : 'Rejected'} by `), `${p.user.by.name}${p.user.note ? `: ${p.user.note}` : ''}`) : null,
     p.entryPrice !== undefined && p.qty !== undefined
@@ -101,6 +103,14 @@ function card(p: Proposal, deps: TabDeps): HTMLElement {
     h('details.fd-history', {}, h('summary', {}, 'History'), h('ol', {}, ...p.history.map((c) => h('li', {}, `${new Date(c.at).toLocaleString()} · ${STAGE_LABEL[c.stage]} · ${c.by.name}${c.note ? ` · ${c.note}` : ''}`)))),
     actions.length ? h('div.fd-actions', {}, pending && deps.admin() ? note : null, ...actions) : null,
   );
+}
+
+/** The latest committee on it: still sitting, or what it decided. The Committee tab has the ballots. */
+function committeeLine(c: Committee): HTMLElement {
+  if (c.decision) return h('div.fd-line', {}, h('b', {}, `🏛️ ${c.id} decided ${c.decision.vote} `), `${c.decision.by.name}: ${c.decision.summary.slice(0, 240)}`);
+  const t = tally(c);
+  const count = c.status === 'voting' ? `${c.ballots.length}/${c.seats.length} voted` : `${t.BUY} BUY · ${t.HOLD} HOLD · ${t.SELL} SELL`;
+  return h('div.fd-line', {}, h('b', {}, `🏛️ ${c.id} ${COMMITTEE_STATUS_LABEL[c.status].toLowerCase()} `), count);
 }
 
 /** The risk engine's verdict: the decision and why, and every check behind it. */

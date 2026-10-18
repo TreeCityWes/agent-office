@@ -90,7 +90,7 @@ idea → research → proposed → risk_review → cio_review → user_approval 
                                   └──────────────┴──────────────┴──→ rejected   (and withdrawn, expired, failed)
 ```
 
-A proposal (`P-1`, `P-2`…) carries the asset, direction, size, entry, stop (its invalidation), target, horizon, thesis, catalyst, confidence, evidence and the strongest dissenting view. An idea needs only the asset, direction and thesis, and is filled in later. On submit a proposal goes straight through risk review (code, below). What passes waits on the CIO or PM to endorse it, when the fund requires it (the default) and one is at a desk; nobody rules on their own proposal. Then it waits on a person to approve it. A person may approve from CIO review without waiting, and that's on the record. Approving runs risk **again** against the book and the price as they are then, and fills on paper at what risk allows then, never more than was asked. While it's open the office watches its stop and target on every fresh price and exits it when either is hit. Once it's out, its author writes the post-trade review. A proposal nobody decides on expires after 24 hours (a setting).
+A proposal (`P-1`, `P-2`…) carries the asset, direction, size, entry, stop (its invalidation), target, horizon, thesis, catalyst, confidence, evidence and the strongest dissenting view. An idea needs only the asset, direction and thesis, and is filled in later. On submit a proposal goes straight through risk review (code, below). What passes waits on the CIO or PM to endorse it, when the fund requires it (the default) and one is at a desk; nobody rules on their own proposal. A proposal over 8% of NAV (a setting) needs [an investment committee's](#the-investment-committee) decision before an agent CIO or PM can rule on it. Then it waits on a person to approve it. A person may approve from CIO review without waiting, and that's on the record. Approving runs risk **again** against the book and the price as they are then, and fills on paper at what risk allows then, never more than was asked. While it's open the office watches its stop and target on every fresh price and exits it when either is hit. Once it's out, its author writes the post-trade review. A proposal nobody decides on expires after 24 hours (a setting).
 
 ### Risk
 
@@ -127,14 +127,15 @@ It only asks while it's needed: for ten minutes after anyone opens the fund or a
 
 ### Audit
 
-The fund keeps four append-only JSONL journals in the office's data folder, `~/agent-office/.agent-office/fund/`, outside every project checkout the agents work in. Each line carries the hash of the one before:
+The fund keeps five append-only JSONL journals in the office's data folder, `~/agent-office/.agent-office/fund/`, outside every project checkout the agents work in. Each line carries the hash of the one before:
 
 | Journal | What's in it |
 | --- | --- |
 | `ledger.jsonl` | capital paid in and out, every fill, every change to the risk limits and the settings: the book and its rules are replayed from it |
 | `proposals.jsonl` | each proposal as it went through each stage |
 | `nav.jsonl` | the NAV over time, with the day's start and the high-water mark |
-| `activity.jsonl` | every proposal, risk verdict, ruling, approval, fill, exit, limit change and review, with who did it |
+| `committees.jsonl` | each investment committee as it went: called, every ballot, opened, decided or lapsed |
+| `activity.jsonl` | every proposal, risk verdict, ruling, approval, fill, exit, limit change, committee step and review, with who did it |
 
 Nothing is written until the fund is first used. The office checks every chain when it starts. A line cut short when the office stopped mid-write is dropped and noted; anything else that doesn't match (a line edited, removed or added by hand) stops the fund from trading, and the 💼 Fund window says which journal and which line, rather than trading on a book someone edited. To carry on, a person starts the fund over, which moves the old records aside to `fund-<time>/` rather than deleting them.
 
@@ -142,19 +143,20 @@ The chain makes tampering evident, not impossible: the agents run as the same us
 
 ## The 💼 Fund window
 
-**☰ → 💼 Fund** opens the fund over the office, as a trading terminal. Along the top: the NAV, the day's P&L, the total return, the drawdown, the leverage, and whether prices are coming in (**LIVE DATA**, **DATA IDLE** or **MOCK DATA**). Badges say what you're looking at: **PAPER** always, **MOCK MARKET** on simulated prices, **HALTED** when a journal didn't check out. Keys **1**–**7** turn to a tab:
+**☰ → 💼 Fund** opens the fund over the office, as a trading terminal. Along the top: the NAV, the day's P&L, the total return, the drawdown, the leverage, and whether prices are coming in (**LIVE DATA**, **DATA IDLE** or **MOCK DATA**). Badges say what you're looking at: **PAPER** always, **MOCK MARKET** on simulated prices, **HALTED** when a journal didn't check out. Keys **1**–**8** turn to a tab:
 
 | Tab | What's on it |
 | --- | --- |
 | Overview | NAV, the day's and total P&L, cash, gross and net exposure, leverage and drawdown against their limits, fees paid; the NAV over time; the positions, with what each is up or down; exposure by asset class |
 | Agents | Every role by department, staffed or vacant. A staffed desk shows its agent, what its process is doing and the status it reports, its assignment, thesis and confidence, and its record; **Memory** opens its thesis history, observations and decisions. Staff a vacant desk with an agent already at work or a new hire; **Hire** on the team bar staffs whichever of the core team (the CIO, the Macro and Crypto Analysts, the Quant Researcher and the Skeptic) is missing, in one go. Assign a task, send a message or release a desk. Underneath, the messages between the desks |
-| Proposals | Waiting on your approval, with the CIO, open trades, ideas and research, finished. Each shows its thesis, catalyst, evidence and dissent, every risk check with its numbers, the CIO's and the person's rulings, its fill, its exit and review, and its history. Approve or reject it with a note for the record, or exit an open trade now. **Propose a trade yourself** goes through the same risk engine as an agent's |
+| Proposals | Waiting on your approval, with the CIO, open trades, ideas and research, finished. Each shows its thesis, catalyst, evidence and dissent, every risk check with its numbers, the CIO's and the person's rulings, its fill, its exit and review, and its history. Approve or reject it with a note for the record, or exit an open trade now. **Propose a trade yourself** goes through the same risk engine as an agent's. A proposal a committee sat on says how it went |
+| Committee | [Investment committees](#the-investment-committee), sitting and decided. Each shows its question and proposal, its seats (the Skeptic marked 😈) and who has voted, then, once the ballots are open, every ballot with its argument, evidence and risks, the tally and the decision. **Call a committee** puts a question or a proposal to the desks you tick, the Skeptic always among them. Open the ballots early, or decide one that waits on a person (or over its chair) |
 | Risk | The book against each limit, exposure by correlation group, and the limits themselves, to change |
 | Market | Every price with its source and age (**MOCK** marked, a price too old to trade on in red), the latest signals, and how each source is doing |
-| Activity | The fund's own log, by kind: every proposal, verdict, ruling, fill, exit, limit change and review, and every thesis, observation, status, assignment, message and escalation from the desks, with who did it |
-| Settings | The fund's name, fee and slippage, its market data (public or mock), whether a CIO or PM rules first, how long a proposal waits; paying capital in or taking it out; starting over |
+| Activity | The fund's own log, by kind: every proposal, verdict, ruling, committee step, fill, exit, limit change and review, and every thesis, observation, status, assignment, message and escalation from the desks, with who did it |
+| Settings | The fund's name, fee and slippage, its market data (public or mock), whether a CIO or PM rules first, how long a proposal waits, how big a proposal must be (as a % of NAV) before an agent CIO needs a committee; paying capital in or taking it out; starting over |
 
-Anyone in the office can watch. Only admins act: approve, reject, exit, close, propose, staff and release desks, assign and message them, change the limits or settings, move capital or start over. The office checks that itself, not the window (everyone on the shared password is an admin; with [accounts](../README.md#add-users), a Member only watches). When a trade waits on a person, or the fund has halted, a 💼 chip on the top bar says so to everyone in the building, with how many.
+Anyone in the office can watch. Only admins act: approve, reject, exit, close, propose, call and decide committees, staff and release desks, assign and message them, change the limits or settings, move capital or start over. The office checks that itself, not the window (everyone on the shared password is an admin; with [accounts](../README.md#add-users), a Member only watches). When a trade waits on a person, or the fund has halted, a 💼 chip on the top bar says so to everyone in the building, with how many.
 
 The window only watches while it's open: it keeps prices coming while you look, and lets go when you close it (**✕** or **Esc**, straight back to looking around).
 
@@ -173,6 +175,7 @@ The office keeps the desks talking without anyone relaying:
 - A message or an assignment is typed into the agent it's for, with who it's from and how to answer. Assignments come from the CIO, PM and CRO (or a person), and become the desk's current assignment.
 - An escalation is a toast to everyone in the building and a message to the CIO.
 - An agent hears what happened to its proposal: the risk verdict, a ruling, a fill, an exit, and when to write its review. When a proposal waits on the CIO, the CIO (or the PM, when the CIO wrote it) is told to rule on it. Nobody rules on their own proposal: a CIO's goes straight to a person.
+- A committee seat is told when it's called (with the proposal in full), when the ballots open (with every ballot), and what was decided; the chair is told when it's its turn to decide.
 
 Every one of these goes in the activity log, with who did it.
 
@@ -191,8 +194,22 @@ What an agent at a desk can call, from its `agent-office` MCP server, or from th
 | `fund_propose`, `fund_withdraw` | roles that propose | propose a trade or an idea (or fill an idea in), withdraw its own |
 | `fund_rule` | CIO, PM | back or reject a proposal at CIO review |
 | `fund_assign` | CIO, PM, CRO | hand a desk a task |
+| `fund_committees` | anyone | the committees sitting and the latest finished, or one in full (while it votes, only your own ballot) |
+| `fund_ballot` | a seated desk | cast or revise its BUY / HOLD / SELL ballot |
+| `fund_committee`, `fund_committee_close`, `fund_decide` | CIO, PM | call a committee, open its ballots early, decide it |
 
 None of them approves a trade, changes a limit or touches the books: a person approves, and approving runs risk again.
+
+## The investment committee
+
+When a decision is bigger than one desk, the CIO or PM (with `fund_committee`), or a person from the Committee tab, calls an investment committee (`C-1`, `C-2`…): a question put to some of the desks, usually about a proposal.
+
+- **The seats.** The desks it asks, every staffed desk by default, and **the Skeptic, always**: there's no committee without one, and the Skeptic is told to make the strongest case against, whatever it privately thinks. The CIO or PM who calls it chairs and doesn't vote; when a person calls it, people decide.
+- **Sealed ballots.** Each seat is told the question and the proposal in full, and casts **BUY**, **HOLD** or **SELL** with its confidence, its argument, its evidence and at least one risk that would make it wrong (`fund_ballot`). While the vote is on, a seat sees only its own ballot and who else has voted, and the log says who voted but not how, so nobody votes with the room.
+- **The ballots open** when every seat has voted, when voting time runs out (15 minutes by default), or when the chair or a person opens them early. Then every seat sees every ballot and the tally: how many of each, a score from −100 (everyone sure it's a SELL) to +100 (everyone sure it's a BUY) weighted by confidence, the vote with the most confidence behind it, and who dissented or didn't vote. A seat may revise its ballot until the decision, and it's marked revised.
+- **The decision.** The chair decides BUY, HOLD or SELL with a summary of what the committee found and the dissent (`fund_decide`); a person may decide any committee. Deciding against the ballots is allowed, and flagged in the log. The seats and the desk whose proposal it was are told. A committee nobody decides in time (as long as its vote ran, and at least 10 minutes) lapses, its ballots on the record.
+
+A committee advises: it never places, sizes or approves a trade. One rule about it is code: an agent CIO or PM can't rule on a proposal bigger than **8% of NAV** (a setting; 0 turns it off) until a committee has decided on it, and is told so when it's asked to rule. People are never held to it. Every committee, ballot and decision is in `committees.jsonl` (see [Audit](#audit)) and the activity log, and each desk's part (`called`, `voted`, `decided`) goes in its memory.
 
 ## The plan
 
@@ -203,7 +220,7 @@ Each step is a pull request that leaves the office working.
 1. **Fund core** — this page; the pure domain (`shared/fund/`); the records, paper venue, exits, market data and the `Fund` service (`server/fund/`), as `ctx.fund`; tests. Nothing visible yet, and nothing on disk or on the network until it's used.
 2. **Dashboards** ✅ — the fund's messages (`shared/protocol/fund.ts`) and their handlers (`server/ws/handlers/fund.ts`, where the admin check lives), the state slice, and [the 💼 Fund window](#the--fund-window) with its chip on the top bar.
 3. **Agents at the desks** ✅ — [staffing a role](#agents-at-the-desks) (brief, permissions, memory folder, the sign over its desk), [the fund's tools](#the-fund-tools) on the agents' MCP server and the `office-fund` command, messages, assignments and escalations between the desks, the desk profiles, and the Agents tab.
-4. **The investment committee** — the CIO or PM calls a meeting on a proposal; each seat casts BUY / HOLD / SELL with its confidence, argument, evidence and risk; the Skeptic always sits; the CIO sums it up.
+4. **The investment committee** ✅ — [committees](#the-investment-committee) (`shared/fund/committee.ts`, `server/fund/committee.ts`): sealed BUY / HOLD / SELL ballots with confidence, argument, evidence and risks, the Skeptic always seated, a confidence-weighted tally, the chair's decision, the size gate on an agent CIO's ruling, the committee tools, and the Committee tab.
 5. **Strategies and backtests** — the strategy registry (idea → research → backtest → validation → paper → approved → retired), a backtest service (Sharpe, drawdown, win rate, profit factor, turnover), and their tabs.
 6. **The trading floor** — the map: desks grouped by department with their signs, ticker walls and portfolio and risk screens, the CIO's office, the committee room, and a risk event you can see from across the floor.
 

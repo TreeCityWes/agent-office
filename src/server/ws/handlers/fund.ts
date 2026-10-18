@@ -2,7 +2,7 @@
 // office can look; only an admin approves, rejects, exits, changes the limits or settings, moves
 // capital or starts the fund over, and the fund itself checks every one of those again.
 import type { FundBrief, FundClientMsg } from '../../../shared/protocol.js';
-import type { FundDeskClientMsg } from '../../../shared/protocol/fund.js';
+import type { FundCommitteeClientMsg, FundDeskClientMsg } from '../../../shared/protocol/fund.js';
 import type { ActivityEvent, Actor } from '../../../shared/fund/types.js';
 import type { Fund, Result } from '../../fund/fund.js';
 import type { Ctx } from '../../office/context.js';
@@ -104,4 +104,4 @@ export const fundHandlers = {
     if (!admin(ctx, c)) return;
     reply(ctx, c, ctx.fund.reset(actor(c)), '💼 The fund starts over; the old records were kept');
   },
-} satisfies HandlerMap<Exclude<FundClientMsg, FundDeskClientMsg>>;
+} satisfies HandlerMap<Exclude<FundClientMsg, FundDeskClientMsg | FundCommitteeClientMsg>>;

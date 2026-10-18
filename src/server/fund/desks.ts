@@ -36,6 +36,8 @@ export interface DeskFund {
   readonly proposals: { list(): Proposal[]; get(id: string): Proposal | undefined };
   log(kind: ActivityEvent['kind'], by: Actor, text: string, extra?: Pick<ActivityEvent, 'proposalId' | 'symbol' | 'level'>): void;
   changed(): void;
+  /** What the CIO should know before ruling on it: that it needs the committee first. */
+  beforeRuling?(p: Proposal): string;
 }
 
 type Result<T extends object = object> = ({ ok: true } & T) | { error: string };
@@ -371,6 +373,19 @@ ${START}`;
     return { ok: true, message: m };
   }
 
+  /** A note from the fund itself to a desk (the committee's calls): kept with the messages, typed into its agent. */
+  notify(from: Actor, role: string, summary: string, text: string, kind: MessageKind, proposalId?: string): boolean {
+    const p = this.holder(role);
+    if (!p) return false;
+    this.record({ id: this.nextId(), at: this.fund.now(), kind, from, to: role, text: summary.slice(0, 500), ...(proposalId ? { proposalId } : {}) });
+    return !this.office?.tell(p.workerId, text, from.name);
+  }
+
+  /** A toast to everyone in the building: something waits on the people running the fund. */
+  announceToPeople(text: string) {
+    this.office?.announce(text, 'info');
+  }
+
   // ---- Keeping desks in the loop ---------------------------------------------------------------
 
   /**
@@ -403,7 +418,7 @@ ${START}`;
     if (p.stage === 'cio_review') {
       this.asked.add(`${id}:${p.stage}`);
       const ruler = [this.holder('cio'), this.holder('pm')].find((d) => d && d.workerId !== p.author.id);
-      if (ruler) this.office.tell(ruler.workerId, `⚖️ ${what}, ${p.sizeUsd ? `$${Math.round(p.risk?.approvedUsd ?? p.sizeUsd).toLocaleString('en-US')} ` : ''}from ${deskName(p.author)}, passed risk and waits on your ruling. Read it with fund_proposals (id ${p.id}), then fund_rule: back it or turn it down, with your reasons.`, 'The fund');
+      if (ruler) this.office.tell(ruler.workerId, `⚖️ ${what}, ${p.sizeUsd ? `$${Math.round(p.risk?.approvedUsd ?? p.sizeUsd).toLocaleString('en-US')} ` : ''}from ${deskName(p.author)}, passed risk and waits on your ruling. Read it with fund_proposals (id ${p.id}), then fund_rule: back it or turn it down, with your reasons.${this.fund.beforeRuling?.(p) ?? ''}`, 'The fund');
     } else if (p.stage === 'user_approval' && p.author.kind === 'agent') {
       this.asked.add(`${id}:${p.stage}`);
       this.office.announce(`💼 ${what} from ${deskName(p.author)} waits on a person’s approval in the 💼 Fund window`, 'info');

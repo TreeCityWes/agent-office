@@ -1,4 +1,5 @@
 // The paper-trading fund (docs/fund.md): what the 💼 Fund window shows, and what people do there.
+import type { Vote } from '../fund/committee.js';
 import type { DeskMemory } from '../fund/desks.js';
 import type { FundConfig, FundState } from '../fund/state.js';
 import type { AgentEffort, AgentProvider } from './agents.js';
@@ -33,7 +34,8 @@ export type FundClientMsg =
   | { t: 'fund.cash'; amount: number; note?: string }
   /** Start the fund over; its records are moved aside, not deleted. */
   | { t: 'fund.reset' }
-  | FundDeskClientMsg;
+  | FundDeskClientMsg
+  | FundCommitteeClientMsg;
 
 /** Staffing the fund's desks, and talking to them (ws/handlers/fund-desks.ts). */
 export type FundDeskClientMsg =
@@ -49,6 +51,13 @@ export type FundDeskClientMsg =
   | { t: 'fund.message'; to: string; text: string }
   /** Send me a role's memory. */
   | { t: 'fund.memory'; role: string };
+
+/** The investment committee, from the window (ws/handlers/fund-committee.ts). A person who calls one decides it. */
+export type FundCommitteeClientMsg =
+  | { t: 'fund.convene'; question: string; proposalId?: string; symbol?: string; seats?: string[]; minutes?: number }
+  /** Open the ballots now, counting whoever hasn't voted as abstaining. */
+  | { t: 'fund.committee.close'; id: string }
+  | { t: 'fund.decide'; id: string; vote: Vote; summary: string };
 
 export type FundServerMsg =
   | { t: 'fund.brief'; brief: FundBrief }

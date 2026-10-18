@@ -1,4 +1,4 @@
-// The 💼 Fund window's settings: the fund's name, costs, market data and approvals; capital paid in or
+// The 💼 Fund window's settings: the fund's name, costs, market data, approvals and the committee gate; capital paid in or
 // taken out; and starting over. Admins only, and every change goes in the ledger with who made it.
 import { usd } from '../../../shared/fund/format';
 import type { FundConfig, FundState } from '../../../shared/fund/state';
@@ -18,6 +18,7 @@ export function settingsTab(deps: TabDeps): FundTab {
   const market = h('select.fd-input', { onchange: mark }, h('option', { value: 'public' }, 'Public sources (Coinbase, Yahoo, OKX)'), h('option', { value: 'mock' }, 'MOCK market (simulated, 60× fast)')) as HTMLSelectElement;
   const cio = h('input', { type: 'checkbox', onchange: mark }) as HTMLInputElement;
   const ttl = h('input.fd-input', { type: 'number', min: '1', max: '720', step: '1', oninput: mark }) as HTMLInputElement;
+  const cmt = h('input.fd-input', { type: 'number', min: '0', max: '100', step: 'any', oninput: mark }) as HTMLInputElement;
   const save = h('button.fd-btn.go', { type: 'button', disabled: true }, 'Save settings') as HTMLButtonElement;
   const field = (label: string, input: HTMLElement, unit = '') => h('label.fd-field', {}, h('span', {}, label), h('div.fd-row', {}, input, unit ? h('span.fd-unit', {}, unit) : null));
 
@@ -33,6 +34,8 @@ export function settingsTab(deps: TabDeps): FundTab {
     if (cio.checked !== current.requireCio) next.requireCio = cio.checked;
     const t = numberOf(ttl);
     if (t !== undefined && t !== current.proposalTtlHours) next.proposalTtlHours = t;
+    const c = numberOf(cmt);
+    if (c !== undefined && c !== current.committeeOverPct) next.committeeOverPct = c;
     deps.send({ t: 'fund.config', config: next });
     dirty = false;
     save.disabled = true;
@@ -62,6 +65,7 @@ export function settingsTab(deps: TabDeps): FundTab {
       field('Market data', market),
       field('Undecided proposals expire after', ttl, 'hours'),
       h('label.fd-check', {}, cio, ' A CIO or PM at a desk rules on proposals before a person does'),
+      field('An agent CIO needs a committee over', cmt, '% of NAV'),
     ),
     h('div.fd-actions', {}, h('span.fd-hint', {}, 'Switching the market data drops every price from the other: positions are valued at cost until new ones come.'), save),
   ) as HTMLFieldSetElement;
@@ -92,6 +96,7 @@ export function settingsTab(deps: TabDeps): FundTab {
     market.value = s.config.market;
     cio.checked = s.config.requireCio;
     ttl.value = String(s.config.proposalTtlHours);
+    cmt.value = String(s.config.committeeOverPct);
   }
 
   return { el, update };

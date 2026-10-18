@@ -190,6 +190,64 @@ export const FUND_TOOLS = [
     inputSchema: schema({ to: str('A role id or a worker name, as fund_desks lists them.'), text: str('The task, complete on its own.'), proposalId: ID }, ['to', 'text']),
     annotations: act,
   },
+  {
+    name: 'fund_committees',
+    route: 'GET committees',
+    title: 'Investment committees',
+    description: "The investment committees sitting and the latest finished, or one by id: its question, seats, who has voted, the ballots once they're open, the tally and the decision. While a committee votes, you see only your own ballot.",
+    inputSchema: schema({ id: str('A committee, like C-3.') }),
+    annotations: read,
+  },
+  {
+    name: 'fund_ballot',
+    route: 'POST ballot',
+    title: 'Cast a committee ballot',
+    description:
+      "Your ballot on a committee you sit on: BUY, HOLD or SELL, how sure you are, your argument, the evidence and the risks that would make you wrong. It stays sealed until every seat has voted or voting closes; after that you may revise it until the decision. Vote what you think, not what the room thinks.",
+    inputSchema: schema(
+      {
+        id: str('The committee, like C-3.'),
+        vote: { type: 'string', enum: ['BUY', 'HOLD', 'SELL'] },
+        confidence: num('0 to 100.'),
+        argument: str('Why, in a few sentences.'),
+        evidence: { type: 'array', items: { type: 'string' }, description: 'The facts it rests on, each with its source.' },
+        risks: { type: 'array', items: { type: 'string' }, description: 'What would make this vote wrong.' },
+      },
+      ['id', 'vote', 'confidence', 'argument', 'risks'],
+    ),
+    annotations: act,
+  },
+  {
+    name: 'fund_committee',
+    route: 'POST committee',
+    title: 'Call the investment committee',
+    description:
+      "As CIO or PM, puts a question (usually a proposal) to the desks: each seat casts a sealed BUY / HOLD / SELL ballot, the Skeptic always among them, then the ballots open and you decide with fund_decide. Seats default to every staffed desk. A proposal over the fund's committee threshold needs a decision before you can rule on it.",
+    inputSchema: schema({
+      question: str('What the committee is to decide.'),
+      proposalId: ID,
+      symbol: str('The asset, when it is not about one proposal.'),
+      seats: { type: 'array', items: { type: 'string' }, description: 'Role ids to seat (the Skeptic is always added); every staffed desk when left out.' },
+      minutes: num('How long voting stays open: 1 to 240, 15 by default.'),
+    }),
+    annotations: act,
+  },
+  {
+    name: 'fund_committee_close',
+    route: 'POST committee-close',
+    title: 'Open the ballots now',
+    description: "As the chair, closes a committee's vote early and opens the ballots, counting whoever has not voted as abstaining.",
+    inputSchema: schema({ id: str('The committee, like C-3.') }, ['id']),
+    annotations: act,
+  },
+  {
+    name: 'fund_decide',
+    route: 'POST decide',
+    title: 'Decide a committee',
+    description: "As a committee's chair, once its ballots are open: the committee's decision (BUY, HOLD or SELL) and a summary of what it found, the dissent and why. It goes on the record and to every seat. A committee advises: a trade still goes through risk and a person's approval.",
+    inputSchema: schema({ id: str('The committee, like C-3.'), vote: { type: 'string', enum: ['BUY', 'HOLD', 'SELL'] }, summary: str('What the committee found, the dissent, and why you decide this way.') }, ['id', 'vote', 'summary']),
+    annotations: act,
+  },
 ];
 
 const BY_NAME = new Map(FUND_TOOLS.map((t) => [t.name, t]));
@@ -246,7 +304,7 @@ export async function runFundTool(name, args, io) {
 /** What the agent-office MCP server adds to its instructions about the fund. */
 export const FUND_INSTRUCTIONS =
   " If you hold a desk at the office's paper-trading fund, its fund_* tools are how you read its book, market data and proposals, keep your memory (fund_thesis, fund_observe), " +
-  'report your status, message the other desks and propose trades (the office-fund command does the same from a shell). Its risk engine is code, and a person approves every trade.';
+  'report your status, message the other desks, propose trades and vote on its investment committee (fund_ballot); the office-fund command does the same from a shell. Its risk engine is code, and a person approves every trade.';
 
 const USAGE = `Usage:
   office-fund <tool> ['<json>']      call one of the fund's tools, its arguments as JSON (or on stdin)

@@ -1,6 +1,7 @@
 // What the fund keeps and what it shows: its settings, the ledger journal's entries, market data
 // beyond prices, and the state the dashboards draw (see docs/fund.md). Types and checks only.
 import { checkAsset, cleanSymbol, DEFAULT_WATCHLIST } from './assets.js';
+import type { Committee } from './committee.js';
 import type { DesksState } from './desks.js';
 import type { Actor, Asset, Fill, PortfolioView, Proposal, Quote, RiskLimits } from './types.js';
 
@@ -18,6 +19,8 @@ export interface FundConfig {
   assets: Asset[];
   /** Proposals go to the CIO (or PM) before a person, when one is at a desk. */
   requireCio: boolean;
+  /** A proposal over this % of NAV needs an investment committee's decision before the CIO may back it (0: never). */
+  committeeOverPct: number;
   /** A proposal nobody decides on in this long expires. */
   proposalTtlHours: number;
 }
@@ -30,6 +33,7 @@ export const DEFAULT_CONFIG: FundConfig = {
   watchlist: [...DEFAULT_WATCHLIST],
   assets: [],
   requireCio: true,
+  committeeOverPct: 8,
   proposalTtlHours: 24,
 };
 
@@ -61,6 +65,11 @@ export function checkConfig(raw: unknown, base: FundConfig = DEFAULT_CONFIG): { 
   if (r.requireCio !== undefined) {
     if (typeof r.requireCio !== 'boolean') return { error: 'requireCio is true or false' };
     out.requireCio = r.requireCio;
+  }
+  if (r.committeeOverPct !== undefined) {
+    const v = num(r.committeeOverPct, 0, 100);
+    if (v === undefined) return { error: 'committeeOverPct is from 0 (never) to 100' };
+    out.committeeOverPct = v;
   }
   if (r.proposalTtlHours !== undefined) {
     const v = num(r.proposalTtlHours, 1, 24 * 30);
@@ -169,6 +178,8 @@ export interface FundState {
   nav: NavPoint[];
   /** The agents holding the fund's roles, each role's record, and the latest messages between desks. */
   desks: DesksState;
+  /** Committees still sitting, then the latest finished. */
+  committees: Committee[];
   /** Why the fund isn't trading: its journals don't check out. */
   halted?: string;
   /** What was put right when the journals were read. */

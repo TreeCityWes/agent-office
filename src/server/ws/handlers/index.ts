@@ -10,6 +10,7 @@ import { decorHandlers, decorView } from './decor.js';
 import { dogHandlers, dogView } from './dog.js';
 import { floorHandlers, projectView } from './floors.js';
 import { fundHandlers } from './fund.js';
+import { fundCommitteeHandlers } from './fund-committee.js';
 import { fundDeskHandlers } from './fund-desks.js';
 import { githubHandlers, issuesView, pullsView } from './github.js';
 import { jukeboxHandlers, jukeboxView } from './jukebox.js';
@@ -38,6 +39,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...floorHandlers,
   ...fundHandlers,
   ...fundDeskHandlers,
+  ...fundCommitteeHandlers,
   ...githubHandlers,
   ...jukeboxHandlers,
   ...meetingHandlers,
