@@ -136,6 +136,50 @@ export const FUND_TOOLS = [
     annotations: read,
   },
   {
+    name: 'fund_request',
+    route: 'POST request',
+    title: 'Ask a desk for research',
+    description:
+      "Asks another desk a question: it's typed into that agent's session and stays open, where you, it and the people running the fund can see it, until that desk answers with fund_answer, when you hear the answer. " +
+      'Name the desk by role id (crypto-analyst, quant, macro…) or its worker\'s name; give dueInMin if you need it by then (the desk is reminded once it passes). An idea (proposalId) moves to Research. withdraw: an id of yours takes it back instead.',
+    inputSchema: schema({ to: str('A role id or a worker name, as fund_desks lists them.'), question: str('What it should find out, complete on its own.'), proposalId: ID, symbol: str('The asset it is about, if one.'), dueInMin: num('Minutes from now you need it by (optional).'), withdraw: str('A request id of yours, like R-3, to take back instead.'), note: str('Why you took it back (with withdraw).') }),
+    annotations: act,
+  },
+  {
+    name: 'fund_answer',
+    route: 'POST answer',
+    title: 'Answer a research request',
+    description: 'Answers a research request put to your desk (fund_requests mine=to lists them): what you found, your confidence and your sources. It closes the request, goes to whoever asked, and stays on the Research tab.',
+    inputSchema: schema({ id: str('The request, like R-3.'), text: str('What you found: the answer, with numbers.'), confidence: num('0-100.'), sources: { type: 'array', items: { type: 'string' }, description: 'Where it came from: links, data, filings.' } }, ['id', 'text']),
+    annotations: act,
+  },
+  {
+    name: 'fund_requests',
+    route: 'GET requests',
+    title: 'Research requests',
+    description: "The research requests between the desks: open by default, the oldest due first. mine=to lists those put to your desk, mine=from those you asked; status answered (or all) shows the answers. id gives one.",
+    inputSchema: schema({ status: str('open (the default), answered, withdrawn or all.'), mine: str('to or from.'), id: str('One request, like R-3.') }),
+    annotations: read,
+  },
+  {
+    name: 'fund_routines',
+    route: 'GET routines',
+    title: 'Desk routines',
+    description: "The routines the office types into the desks on a schedule: each one's desk, prompt, how often, who set it, when it last ran and what happened, and when it's next due.",
+    inputSchema: schema({}),
+    annotations: read,
+  },
+  {
+    name: 'fund_routine',
+    route: 'POST routine',
+    title: 'Set a desk routine',
+    description:
+      'As CIO, PM or CRO, sets a routine: a standing prompt the office types into a desk every everyMin minutes (5 to 10080), so it picks up that work on a schedule. It waits while the agent is busy, and skips while nobody holds the desk. ' +
+      'With id, changes one (prompt, everyMin, on: false to pause); remove: true removes it; run: true types it in now.',
+    inputSchema: schema({ id: str('A routine, like RT-2, to change, run or remove.'), role: str('The desk, by role id.'), prompt: str('What the desk should do each time, complete on its own.'), everyMin: num('How often, in minutes.'), on: { type: 'boolean' }, remove: { type: 'boolean' }, run: { type: 'boolean' } }),
+    annotations: act,
+  },
+  {
     name: 'fund_escalate',
     route: 'POST escalate',
     title: 'Escalate',
@@ -392,7 +436,7 @@ export async function runFundTool(name, args, io) {
 /** What the agent-office MCP server adds to its instructions about the fund. */
 export const FUND_INSTRUCTIONS =
   " If you hold a desk at the office's paper-trading fund, its fund_* tools are how you read its book, market data and proposals, keep your memory (fund_thesis, fund_observe), " +
-  'report your status, message the other desks, propose trades, vote on its investment committee (fund_ballot) and backtest strategies (fund_backtest); the office-fund command does the same from a shell. Its risk engine is code, and a person approves every trade.';
+  'report your status, message the other desks, ask them for research and answer what you\'re asked (fund_request, fund_answer), propose trades, vote on its investment committee (fund_ballot) and backtest strategies (fund_backtest); the office-fund command does the same from a shell. Its risk engine is code, and a person approves every trade.';
 
 const USAGE = `Usage:
   office-fund <tool> ['<json>']      call one of the fund's tools, its arguments as JSON (or on stdin)
@@ -405,6 +449,7 @@ For example:
   office-fund quotes '{"symbols":["BTC","NVDA"]}'
   office-fund status '{"status":"researching","note":"ETF flows"}'
   office-fund message '{"to":"cio","text":"Done: see my thesis"}'
+  office-fund request '{"to":"crypto-analyst","question":"Is BTC funding stretched?","dueInMin":30}'
   office-fund backtest '{"kind":"trend","params":{"fast":20,"slow":100},"universe":["BTC","ETH"]}'`;
 
 function readStdin(stdin) {

@@ -1,0 +1,33 @@
+/* The 💼 Fund window's research requests (Research tab) and routines (Agents tab). */
+
+.fd-rq-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; max-height: 560px; overflow: auto; }
+.fd-rq { border: 1px solid var(--fd-line); border-left: 3px solid var(--fd-blue); border-radius: 0 4px 4px 0; background: var(--fd-panel); padding: 6px 10px; font-size: 13px; line-height: 1.45; color: #d6dee8; }
+.fd-rq.answered { border-left-color: var(--fd-up); }
+.fd-rq.withdrawn { border-left-color: #3a4654; opacity: .7; }
+.fd-rq.overdue { border-left-color: var(--fd-down); }
+.fd-rq-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font: 11.5px var(--fd-mono); margin-bottom: 3px; }
+.fd-rq-head .grow { flex: 1; }
+.fd-rq-arrow { color: var(--fd-muted); }
+.fd-rq-status { font-size: 10px; padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: .06em; border: 1px solid #23415f; color: var(--fd-blue); }
+.fd-rq-status.answered { color: var(--fd-up); border-color: #1d4a31; }
+.fd-rq-status.withdrawn { color: var(--fd-muted); border-color: var(--fd-line); }
+.fd-rq-status.overdue { color: #fff; background: var(--fd-down); border-color: var(--fd-down); }
+.fd-rq-due { color: var(--fd-amber); }
+.fd-rq.overdue .fd-rq-due { color: var(--fd-down); }
+.fd-rq-q { font-family: system-ui, sans-serif; }
+.fd-rq-a { margin-top: 5px; padding: 5px 9px; background: #05080c; border-left: 2px solid var(--fd-up); border-radius: 0 3px 3px 0; font-family: system-ui, sans-serif; }
+.fd-rq-a-head { font: 11px var(--fd-mono); color: var(--fd-muted); margin-bottom: 2px; }
+.fd-rq-a-head b { color: var(--fd-up); }
+.fd-rq-a .fd-src a { color: var(--fd-blue); }
+.fd-rq-w { margin-top: 3px; color: var(--fd-muted); font: 11px var(--fd-mono); }
+
+.fd-rt-add { display: grid; grid-template-columns: minmax(160px, 220px) auto 1fr auto; gap: 8px; align-items: center; margin-bottom: 6px; }
+.fd-rt-add + .fd-hint { margin-bottom: 10px; }
+.fd-rt-every { display: inline-flex; align-items: center; gap: 5px; font: 12px var(--fd-mono); color: var(--fd-muted); white-space: nowrap; }
+.modal.fund .fd-rt-every .fd-input { width: 70px; }
+@media (max-width: 760px) { .fd-rt-add { grid-template-columns: 1fr auto; } }
+.fd-rt-prompt { display: inline-block; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; color: #d6dee8; }
+.fd-rt-vacant { color: var(--fd-muted); text-decoration: line-through dotted; }
+.fd-rt-last { font-size: 11.5px; color: var(--fd-up); }
+.fd-rt-last.warn { color: var(--fd-amber); }
+.fd-rt-off { color: var(--fd-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }

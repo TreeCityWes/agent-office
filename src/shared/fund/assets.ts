@@ -1,6 +1,7 @@
 // The assets the fund knows out of the box, and checking ones added in its settings. Each says what
 // it is (class, sector, correlation group) and what each source calls it: `news` is its Yahoo
-// headlines symbol, `sec` the company's SEC EDGAR CIK.
+// headlines symbol, `sec` the company's SEC EDGAR CIK, `bitbo` the bitbo.io page of its US spot ETFs'
+// daily flows.
 import { ASSET_CLASSES, type Asset, type AssetClass } from './types.js';
 
 const crypto = (symbol: string, name: string, sector: string, group = 'crypto-beta'): Asset => ({
@@ -11,6 +12,7 @@ const crypto = (symbol: string, name: string, sector: string, group = 'crypto-be
   group,
   feeds: { coinbase: `${symbol}-USD`, okx: `${symbol}-USDT-SWAP`, news: `${symbol}-USD`, mock: symbol },
 });
+const withEtfFlows = (a: Asset, page: string): Asset => ({ ...a, feeds: { ...a.feeds, bitbo: page } });
 const listed = (symbol: string, name: string, cls: AssetClass, sector: string, group: string, cik?: number): Asset => ({
   symbol,
   name,
@@ -21,7 +23,7 @@ const listed = (symbol: string, name: string, cls: AssetClass, sector: string, g
 });
 
 export const DEFAULT_ASSETS: readonly Asset[] = [
-  crypto('BTC', 'Bitcoin', 'Store of value'),
+  withEtfFlows(crypto('BTC', 'Bitcoin', 'Store of value'), 'etf-flows'),
   crypto('ETH', 'Ethereum', 'Layer 1'),
   crypto('SOL', 'Solana', 'Layer 1'),
   crypto('XRP', 'XRP', 'Payments'),

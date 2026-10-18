@@ -1,7 +1,7 @@
 // The 💼 Fund window's desks: every role at the fund by department, the agent holding each (what it
 // says it's doing, its thesis and confidence, how its calls have done), and the messages between them.
 // An admin staffs a role with a new agent or one already at a desk, hands it a task, messages it, or
-// takes the role back; anyone can read a role's memory.
+// takes the role back; anyone can read a role's memory. The desks' routines are listed under them (routines.ts).
 import './agents.css';
 import { winRate, type DeskMemory, type DeskRecord, type DeskView, type FundMessage } from '../../../shared/fund/desks';
 import { DEPARTMENTS, DESK_STATUS_LABEL, ROLE_BY_ID, ROLES, type Department, type RoleDef } from '../../../shared/fund/roles';
@@ -11,11 +11,12 @@ import type { AgentProvider } from '../../../shared/providers';
 import { store } from '../../state';
 import { h, STATUS_LABEL, timeAgo } from '../../ui/dom';
 import { PROVIDER_LABEL, supportedProviders } from '../../ui/provider';
+import { routinesSection } from './routines';
 import { clock, confirmButton, money, section, type FundTab, type TabDeps } from './view';
 
 /** The desks to staff first: a CIO to run it, research on macro and crypto, a quant, and the Skeptic. */
 const CORE = ['cio', 'macro', 'crypto-analyst', 'quant', 'skeptic'];
-const KIND_ICON: Record<FundMessage['kind'], string> = { message: '📨', assignment: '📋', escalation: '🚨', committee: '🏛️' };
+const KIND_ICON: Record<FundMessage['kind'], string> = { message: '📨', assignment: '📋', escalation: '🚨', committee: '🏛️', request: '🔎', routine: '⏰' };
 
 type Panel = 'assign' | 'message' | 'memory';
 
@@ -71,7 +72,8 @@ export function agentsTab(deps: TabDeps): FundTab {
     depts.set(id, { el: h('section.fd-section.fd-dept', { style: `--dept:${d.color}` }, title, list), title, list });
   }
   const messages = h('ol.fd-log.fd-msgs');
-  const el = h('div.fd-tab', {}, team, ...[...depts.values()].map((d) => d.el), section('Between the desks', messages));
+  const routines = routinesSection(deps);
+  const el = h('div.fd-tab', {}, team, ...[...depts.values()].map((d) => d.el), routines.el, section('Between the desks', messages));
   const rows = new Map<string, { sig: string; el: HTMLElement }>();
   const open = new Map<string, Panel>();
   const drafts = new Map<string, string>();
@@ -228,6 +230,7 @@ export function agentsTab(deps: TabDeps): FundTab {
       const roles = ROLES.filter((r) => r.department === id);
       dept.title.textContent = `${DEPARTMENTS[id].icon} ${DEPARTMENTS[id].label} · ${roles.filter((r) => byRole.has(r.id)).length}/${roles.length}`;
     }
+    routines.update(s);
     drawMessages(s);
   }
 

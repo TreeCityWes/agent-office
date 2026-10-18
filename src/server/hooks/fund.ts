@@ -8,6 +8,7 @@ import type { Ctx } from '../office/context.js';
 import { readBody, send } from '../http/util.js';
 import { LAB_ACTIONS, LAB_READS } from './fund-lab.js';
 import { RESEARCH_READS } from './fund-research.js';
+import { WORK_ACTIONS, WORK_READS } from './fund-work.js';
 
 type Body = Record<string, unknown>;
 export type Answer = object | Promise<object>;
@@ -111,6 +112,7 @@ const READS: Record<string, (a: Ask) => Answer> = {
   },
   ...LAB_READS,
   ...RESEARCH_READS,
+  ...WORK_READS,
 };
 
 /** After a fund action an agent took: on its role's record when it went through. */
@@ -161,6 +163,7 @@ const ACTIONS: Record<string, (a: Ask) => Answer> = {
     return r;
   },
   ...LAB_ACTIONS,
+  ...WORK_ACTIONS,
 };
 
 /**

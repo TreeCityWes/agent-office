@@ -1,6 +1,6 @@
 /* The 💼 Fund window's Research tab, and the P&L on the Portfolio tab. Each desk is in its department's colour. */
 
-.fd-rs-ask { display: grid; grid-template-columns: minmax(180px, 260px) 150px 1fr auto; gap: 8px; align-items: center; }
+.fd-rs-ask { display: grid; grid-template-columns: minmax(180px, 260px) 150px 1fr 140px auto; gap: 8px; align-items: center; }
 .fd-rs-ask + .fd-hint { margin-top: 6px; }
 @media (max-width: 760px) { .fd-rs-ask { grid-template-columns: 1fr 1fr; } }
 

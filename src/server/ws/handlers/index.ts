@@ -14,6 +14,7 @@ import { fundCommitteeHandlers } from './fund-committee.js';
 import { fundDeskHandlers } from './fund-desks.js';
 import { fundLabHandlers } from './fund-lab.js';
 import { fundResearchHandlers } from './fund-research.js';
+import { fundWorkHandlers } from './fund-work.js';
 import { githubHandlers, issuesView, pullsView } from './github.js';
 import { jukeboxHandlers, jukeboxView } from './jukebox.js';
 import { meetingHandlers, meetingView } from './meetings.js';
@@ -44,6 +45,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...fundCommitteeHandlers,
   ...fundLabHandlers,
   ...fundResearchHandlers,
+  ...fundWorkHandlers,
   ...githubHandlers,
   ...jukeboxHandlers,
   ...meetingHandlers,
