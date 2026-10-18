@@ -61,6 +61,7 @@ export async function startServer(cfg: Config, opts: StartOptions = {}) {
     tailnet.stop();
     ctx.webhook.stop();
     ctx.machine.stop();
+    ctx.fund.stop();
     ctx.sky.stop();
     ctx.themes.stop();
     for (const f of ctx.floors.values()) f.shutdown(keep);
