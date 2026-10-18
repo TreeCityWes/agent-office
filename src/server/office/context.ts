@@ -25,6 +25,7 @@ import type { OfficePrompts } from '../prompts.js';
 import type { LeaveOnMerge } from '../leave-on-merge.js';
 import type { ChatLog } from '../history.js';
 import type { Arcade, HighScores } from '../cabinet.js';
+import type { Fund } from '../fund/fund.js';
 import type { AgentProvider, FloorInfo, Me, ServerMsg, ServiceInfo, ServicesState, SignInKind } from '../../shared/protocol.js';
 import type { Client } from './client.js';
 import type { Spot } from './input.js';
@@ -69,6 +70,8 @@ export interface BuildingServices {
   accountLimits: Map<string, { key: string; reader: PlanLimitsReader }>;
   webhook: Webhook;
   machine: Machine;
+  /** The paper-trading fund: its book, proposals, risk and market data, one for the building (docs/fund.md). */
+  fund: Fund;
   /** Whose plan `c` sees: their own, on an account with its own Claude sign-in; else the office's. */
   limitsOf(c: Client): PlanLimitsReader;
   /** Queues everywhere may be waiting for room under the worker limit: let them look again. */
