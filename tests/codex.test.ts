@@ -37,6 +37,14 @@ test('rejects unknown, malformed, empty, oversized, and child-scoped events', ()
   assert.equal(validateCodexHook('Stop', { session_id: 'x', agent_id: 'c'.repeat(161) }), false);
 });
 
+/** The hook command for `event`, read back out of its `-c` override as Codex's TOML parser would. */
+function hookCommand(args: string[], event: string): string {
+  const config = args.find((a) => a.startsWith(`hooks.${event}=`)) ?? '';
+  const quoted = /command=("(?:[^"\\]|\\.)*")/.exec(config)?.[1];
+  assert.ok(quoted, config);
+  return JSON.parse(quoted) as string;
+}
+
 test('generates one stable CLI hook override per supported event', () => {
   const args = codexHookArgs('/tmp/office data/agent-office-codex-hook.cjs');
   assert.equal(args.length, CODEX_HOOK_EVENTS.length * 2);
@@ -47,6 +55,11 @@ test('generates one stable CLI hook override per supported event', () => {
     assert.match(args[i * 2 + 1], /timeout=3/);
     assert.match(args[i * 2 + 1], /agent-office-codex-hook\.cjs/);
   }
+  // Codex runs a hook with `sh -lc` elsewhere and `cmd.exe /C` on Windows, which has no single quotes.
+  const posix = hookCommand(codexHookArgs("/tmp/it's here/hook.cjs", 'linux'), 'Stop');
+  assert.equal(posix, `'${process.execPath}' '/tmp/it'"'"'s here/hook.cjs' 'Stop'`);
+  const windows = hookCommand(codexHookArgs('C:\\Office Data\\hook.cjs', 'win32'), 'Stop');
+  assert.equal(windows, `"${process.execPath}" "C:\\Office Data\\hook.cjs" "Stop"`);
 });
 
 test('a worker\'s own model and effort go on Codex\'s command line, in place of an office-wide model', () => {
@@ -86,6 +99,49 @@ test('writes a mode-restricted helper that forwards paths without reading transc
     assert.match(source, /AGENT_OFFICE_HOOK_TOKEN/);
     assert.doesNotMatch(source, /readFile|readSync|createReadStream/);
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the hook command runs in the shell Codex runs it in, and reaches the office', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent office codex '));
+  const received: string[] = [];
+  const server = createServer((req, res) => {
+    received.push(req.url ?? '');
+    req.resume();
+    req.on('end', () => res.writeHead(200).end());
+  });
+  try {
+    const file = writeCodexHook(dir);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    assert.ok(address && typeof address === 'object');
+    const line = hookCommand(codexHookArgs(file), 'Stop');
+    // As Codex does it: `%COMSPEC% /C "<command>"`, passed through verbatim, on Windows; `sh -lc <command>` elsewhere.
+    const windows = process.platform === 'win32';
+    const child = spawn(windows ? process.env.ComSpec ?? 'cmd.exe' : '/bin/sh', windows ? ['/C', `"${line}"`] : ['-lc', line], {
+      env: {
+        ...process.env,
+        AGENT_OFFICE_HOOK_URL: `http://127.0.0.1:${address.port}`,
+        AGENT_OFFICE_HOOK_TOKEN: 'hook-token',
+        AGENT_OFFICE_WORKER_ID: 'worker-1',
+      },
+      windowsVerbatimArguments: true,
+    });
+    const { code, stdout, stderr } = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (chunk) => { stdout += chunk; });
+      child.stderr.on('data', (chunk) => { stderr += chunk; });
+      child.on('error', reject);
+      child.on('close', (code) => resolve({ code, stdout, stderr }));
+      child.stdin.end(JSON.stringify({ session_id: 'thread-1', turn_id: 'turn-1' }));
+    });
+    assert.equal(code, 0, stderr);
+    assert.equal(stdout.trim(), '{}');
+    assert.deepEqual(received, ['/hooks/codex?worker=worker-1&event=Stop']);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     rmSync(dir, { recursive: true, force: true });
   }
 });

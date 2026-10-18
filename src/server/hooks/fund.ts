@@ -128,7 +128,7 @@ const ruling = (v: unknown): 'approve' | 'reject' | undefined => {
 };
 
 const ACTIONS: Record<string, (a: Ask) => Answer> = {
-  'risk-check': ({ ctx, body }) => ctx.fund.riskCheck(body),
+  'risk-check': ({ ctx, by, body }) => ctx.fund.riskCheck(body, by),
   propose: ({ ctx, by, body }) =>
     noted(ctx, by, ctx.fund.propose(body, by, { idea: body.idea === true }), (p) => (p.stage === 'idea' ? 'idea' : 'proposed'), (p) => `${p.side} ${p.symbol} $${Math.round(p.sizeUsd)}: ${p.thesis}`),
   promote: ({ ctx, by, body }) => noted(ctx, by, ctx.fund.promote(body.id, body, by), () => 'proposed', (p) => `${p.side} ${p.symbol} $${Math.round(p.sizeUsd)}: ${p.thesis}`),

@@ -24,7 +24,7 @@ export interface DeskWorker {
 /** What the desks need of the office around them (server/fund/office.ts). */
 export interface FundOffice {
   worker(id: string): DeskWorker | undefined;
-  /** Types `text` into the worker's agent as its next prompt, waking it if it's stopped; why not, if it couldn't. */
+  /** Types `text` into the worker's agent as its next prompt, waking it if it's stopped, or once it's answered a question its terminal is asking; why not, if it couldn't. */
   tell(id: string, text: string, by: string): string | undefined;
   /** Hangs a sign over the worker's desk, or takes the fund's down (no text). */
   sign(id: string, text: string | undefined, department?: Department): void;

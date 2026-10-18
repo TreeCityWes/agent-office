@@ -23,6 +23,8 @@ export function settingsTab(deps: TabDeps): FundTab {
   const barNum = (min: string, max: string) => h('input.fd-input', { type: 'number', min, max, step: 'any', oninput: mark }) as HTMLInputElement;
   const bar: Record<keyof ValidationBar, HTMLInputElement> = { years: barNum('0.5', '20'), trades: barNum('0', '1000'), oosSharpe: barNum('-5', '10'), maxDrawdownPct: barNum('1', '100'), profitFactor: barNum('0', '20') };
   const paperDays = h('input.fd-input', { type: 'number', min: '0', max: '365', step: 'any', oninput: mark }) as HTMLInputElement;
+  const paperTrades = h('input.fd-input', { type: 'number', min: '0', max: '1000', step: '1', oninput: mark }) as HTMLInputElement;
+  const paperPf = h('input.fd-input', { type: 'number', min: '0', max: '20', step: 'any', oninput: mark }) as HTMLInputElement;
   const save = h('button.fd-btn.go', { type: 'button', disabled: true }, 'Save settings') as HTMLButtonElement;
   const field = (label: string, input: HTMLElement, unit = '') => h('label.fd-field', {}, h('span', {}, label), h('div.fd-row', {}, input, unit ? h('span.fd-unit', {}, unit) : null));
 
@@ -45,6 +47,10 @@ export function settingsTab(deps: TabDeps): FundTab {
     if (JSON.stringify(b) !== JSON.stringify(current.validationBar)) next.validationBar = b;
     const pd = numberOf(paperDays);
     if (pd !== undefined && pd !== current.strategyPaperDays) next.strategyPaperDays = pd;
+    const pt = numberOf(paperTrades);
+    if (pt !== undefined && pt !== current.strategyPaperTrades) next.strategyPaperTrades = pt;
+    const ppf = numberOf(paperPf);
+    if (ppf !== undefined && ppf !== current.strategyPaperProfitFactor) next.strategyPaperProfitFactor = ppf;
     deps.send({ t: 'fund.config', config: next });
     dirty = false;
     save.disabled = true;
@@ -75,13 +81,15 @@ export function settingsTab(deps: TabDeps): FundTab {
       field('Undecided proposals expire after', ttl, 'hours'),
       h('label.fd-check', {}, cio, ' A CIO or PM at a desk rules on proposals before a person does'),
       field('An agent CIO needs a committee over', cmt, '% of NAV'),
-      h('div.fd-field.wide', {}, h('span', {}, 'The quant lab: what a backtest of a strategy’s current rules must show before it trades on paper, and how long it trades there before a person may approve it')),
+      h('div.fd-field.wide', {}, h('span', {}, 'The quant lab: what a backtest of a strategy’s current rules must show before it trades on paper, and what it must show there before a person may approve it')),
       field('History tested, at least', bar.years, 'years'),
       field('Closed trades, at least', bar.trades),
       field('Out-of-sample Sharpe, at least', bar.oosSharpe),
       field('Max drawdown, at most', bar.maxDrawdownPct, '%'),
       field('Profit factor, at least', bar.profitFactor),
       field('Days on paper before approval', paperDays, 'days'),
+      field('Closed paper trades, at least', paperTrades),
+      field('Paper profit factor, at least', paperPf),
     ),
     h('div.fd-actions', {}, h('span.fd-hint', {}, 'Switching the market data drops every price from the other: positions are valued at cost until new ones come.'), save),
   ) as HTMLFieldSetElement;
@@ -115,6 +123,8 @@ export function settingsTab(deps: TabDeps): FundTab {
     cmt.value = String(s.config.committeeOverPct);
     for (const k of Object.keys(bar) as (keyof ValidationBar)[]) bar[k].value = String(s.config.validationBar[k]);
     paperDays.value = String(s.config.strategyPaperDays);
+    paperTrades.value = String(s.config.strategyPaperTrades);
+    paperPf.value = String(s.config.strategyPaperProfitFactor);
   }
 
   return { el, update };

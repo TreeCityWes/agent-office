@@ -82,7 +82,13 @@ export function validateCodexHook(event: string, payload: unknown): boolean {
   return !!normalizeCodexHook(event, payload);
 }
 
-function shellQuote(value: string): string {
+/**
+ * Quote one word of a hook command for the shell Codex runs it in: `sh -lc` elsewhere, but
+ * `cmd.exe /C "…"` on Windows, where single quotes aren't quotes at all (and a Windows path can't
+ * hold a double quote).
+ */
+function shellQuote(value: string, platform: NodeJS.Platform): string {
+  if (platform === 'win32') return `"${value}"`;
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
 }
 
@@ -90,10 +96,10 @@ function shellQuote(value: string): string {
  * Build the CLI config overrides for all lifecycle hooks. The command is encoded as a TOML basic
  * string so paths containing spaces remain valid; the command itself is shell-quoted.
  */
-export function codexHookArgs(hookPath: string): string[] {
+export function codexHookArgs(hookPath: string, platform: NodeJS.Platform = process.platform): string[] {
   const args: string[] = [];
   for (const event of CODEX_HOOK_EVENTS) {
-    const command = [process.execPath, hookPath, event].map(shellQuote).join(' ');
+    const command = [process.execPath, hookPath, event].map((part) => shellQuote(part, platform)).join(' ');
     const config = `hooks.${event}=[{hooks=[{type="command",command=${JSON.stringify(command)},timeout=3}]}]`;
     args.push('-c', config);
   }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { checkStatus, checkThesis, deskRecord, findRole, fundToolsFor } from '../src/shared/fund/desks.js';
-import { ROLE_BY_ID } from '../src/shared/fund/roles.js';
+import { DEPARTMENTS, ROLE_BY_ID, ROLES } from '../src/shared/fund/roles.js';
 import { handleMcp } from '../bin/office-workers.js';
 import { main as officeFund } from '../bin/office-fund.js';
 import { fundOffice, PEOPLE, toolServer, trade, wait } from './fund-office.js';
@@ -23,6 +23,23 @@ test('what the desk tools take: statuses, theses, roles, and the tools each role
   assert.ok(fundToolsFor(ROLE_BY_ID.get('cio')).includes('fund_rule'));
   assert.ok(fundToolsFor(ROLE_BY_ID.get('cio')).includes('fund_assign'));
   assert.deepEqual(fundToolsFor(undefined).filter((t) => t === 'fund_status' || t === 'fund_propose'), [], 'without a role, a worker only looks');
+});
+
+test('the roster: every role at the fund by department, the Skeptic among them, and who may do what', () => {
+  const titles = (d: string) => ROLES.filter((r) => r.department === d).map((r) => r.title);
+  assert.deepEqual(Object.keys(DEPARTMENTS), ['executive', 'trading', 'research', 'quant', 'risk']);
+  assert.deepEqual(titles('executive'), ['Chief Investment Officer', 'Portfolio Manager', 'Chief Risk Officer', 'Skeptic']);
+  assert.deepEqual(titles('trading'), ['Crypto Trader', 'Equity Trader', 'Execution Trader', 'Arbitrage Analyst']);
+  assert.deepEqual(titles('research'), ['Macro Analyst', 'Crypto Analyst', 'Equity Analyst', 'News Analyst', 'On-chain Analyst', 'Sentiment Analyst', 'Filings Analyst']);
+  assert.deepEqual(titles('quant'), ['Quant Researcher', 'Strategy Researcher', 'Backtester', 'Factor Analyst', 'Data Scientist']);
+  assert.deepEqual(titles('risk'), ['Portfolio Risk', 'Market Risk', 'Liquidity Risk', 'Trade Auditor', 'Compliance']);
+  assert.equal(new Set(ROLES.map((r) => r.id)).size, ROLES.length, 'one id per role');
+  // Only the CIO and PM rule; the risk desks watch and warn, but neither propose nor rule (the risk engine is code).
+  const may = (p: string) => ROLES.filter((r) => (r.can as readonly string[]).includes(p)).map((r) => r.id);
+  assert.deepEqual(may('rule'), ['cio', 'pm']);
+  assert.deepEqual(may('committee'), ['cio', 'pm']);
+  assert.deepEqual(ROLES.filter((r) => r.department === 'risk').flatMap((r) => r.can), []);
+  assert.deepEqual(ROLE_BY_ID.get('skeptic')!.can, []);
 });
 
 test('a desk is staffed by a real worker: one per role, its sign up, its memory kept after it goes', async () => {
@@ -127,7 +144,7 @@ test('with a CIO at a desk, proposals go to it first; the author hears what came
   assert.ok('proposal' in (await fund.approve('P-1', 'Go', PEOPLE)));
   await wait(1700);
   assert.match(told.filter((t) => t.id === 't').at(-1)!.text, /Approved P-1[\s\S]*It’s open/);
-  assert.deepEqual({ ...deskRecord(fund.proposals.list(), 'crypto-trader') }, { proposed: 1, filled: 1, rejected: 0, open: 1, closed: 0, wins: 0, losses: 0, realizedPnl: 0 });
+  assert.deepEqual({ ...deskRecord(fund.proposals.list(), 'crypto-trader') }, { proposed: 1, filled: 1, rejected: 0, open: 1, closed: 0, wins: 0, losses: 0, realizedPnl: 0, history: [] });
   fund.stop();
 });
 

@@ -44,3 +44,9 @@
 .fd-mem b { color: #fff; }
 .fd-src { color: var(--fd-blue); font-size: 11px; }
 .fd-msgs .fd-event { grid-template-columns: max-content 120px minmax(140px, 260px) 1fr; }
+.fd-memory .fd-muted { color: var(--fd-muted); }
+.fd-tools { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 4px; }
+.fd-tools code { font-size: 10.5px; padding: 1px 5px; border: 1px solid var(--fd-line); border-radius: 3px; color: var(--fd-muted); }
+.fd-tools code.own { color: var(--fd-amber); border-color: var(--fd-amber); }
+.fd-rec-chart { margin: 4px 0; padding: 4px; }
+.fd-rec-chart svg { height: 60px; }

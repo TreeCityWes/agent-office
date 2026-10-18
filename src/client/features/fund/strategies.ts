@@ -4,9 +4,10 @@
 // registers strategies, backtests them and moves them along; the gates are shared/fund/strategy.ts's,
 // worked out here too so the board can say what stands in the way before the server does.
 import './lab.css';
+import { usd } from '../../../shared/fund/format';
 import { ROLE_BY_ID, ROLES } from '../../../shared/fund/roles';
 import type { FundState } from '../../../shared/fund/state';
-import { checkMove, fingerprint, NEXT_STAGE, rulesLabel, STRATEGY_STAGE_LABEL, validate, type Backtest, type Strategy, type StrategyStage, type StrategyView } from '../../../shared/fund/strategy';
+import { checkMove, fingerprint, NEXT_STAGE, paperProfitFactor, rulesLabel, STRATEGY_STAGE_LABEL, validate, type Backtest, type PaperRecord, type Strategy, type StrategyStage, type StrategyView } from '../../../shared/fund/strategy';
 import type { Actor } from '../../../shared/fund/types';
 import { h, timeAgo } from '../../ui/dom';
 import { showBacktest, signalChip } from './backtests';
@@ -60,7 +61,8 @@ export function strategiesTab(deps: TabDeps): FundTab {
     const c = s.config;
     const b = latestOf(x, s.backtests);
     const v = b && validate(b, c.validationBar, c.market === 'public');
-    const gate = (to: StrategyStage) => checkMove(x, to, { by: YOU, canStrategy: true, canRule: false, latest: b, bar: c.validationBar, realMarket: c.market === 'public', paperDays: c.strategyPaperDays, now: Date.now() });
+    const gate = (to: StrategyStage) =>
+      checkMove(x, to, { by: YOU, canStrategy: true, canRule: false, latest: b, bar: c.validationBar, realMarket: c.market === 'public', paperDays: c.strategyPaperDays, paper: x.record, paperTrades: c.strategyPaperTrades, paperProfitFactor: c.strategyPaperProfitFactor, now: Date.now() });
     const to = NEXT_STAGE[x.stage];
     const blocked = to ? gate(to) : undefined;
     const r = x.record;
@@ -101,6 +103,7 @@ export function strategiesTab(deps: TabDeps): FundTab {
       days !== undefined && x.stage !== 'retired'
         ? h('div.fd-strat-meta', {}, `${days}d on paper${x.stage === 'paper' ? ` of ${c.strategyPaperDays}` : ''} · ${r.proposals} proposed · ${r.open} open · ${r.closed} closed${r.closed ? ` (${r.wins} won) · ` : ''}`, r.closed ? money(r.realizedPnl, true) : '')
         : null,
+      r.closed && x.stage !== 'retired' ? h('div.fd-strat-meta', { title: 'Its closed trades on paper, fees included' }, paperLine(r)) : null,
       details,
       actions.length ? h('div.fd-strat-acts', {}, ...actions) : null,
       deps.admin() && to && blocked && x.stage !== 'idea' ? h('div.fd-strat-gate', {}, blocked) : null,
@@ -108,6 +111,12 @@ export function strategiesTab(deps: TabDeps): FundTab {
   }
 
   return { el, update };
+}
+
+/** Its closed paper trades' performance: profit factor, return on what they put to work, drawdown. */
+function paperLine(r: PaperRecord): string {
+  const pf = paperProfitFactor(r)!;
+  return `Paper: profit factor ${pf === Infinity ? '∞' : pf.toFixed(2)} · ${r.returnPct >= 0 ? '+' : ''}${r.returnPct.toFixed(1)}% on what it put to work · win rate ${Math.round((r.wins / r.closed) * 100)}% · max drawdown ${usd(r.maxDrawdown)}`;
 }
 
 /** The form to register a strategy. Made once, so what you type survives every update. */

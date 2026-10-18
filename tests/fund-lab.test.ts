@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { simulate, type Bar } from '../src/shared/fund/backtest.js';
-import { checkMove, checkRules, DEFAULT_BAR, offSignal, positionsFor, STRATEGY_KINDS, validate, type Backtest, type MoveContext, type Strategy } from '../src/shared/fund/strategy.js';
+import { checkMove, checkRules, DEFAULT_BAR, offSignal, paperProfitFactor, positionsFor, STRATEGY_KINDS, validate, type Backtest, type MoveContext, type PaperRecord, type Strategy } from '../src/shared/fund/strategy.js';
 import { History, type HistorySource } from '../src/server/fund/history.js';
 import { handleMcp } from '../bin/office-workers.js';
 import { fundOffice, PEOPLE, toolServer, trade } from './fund-office.js';
@@ -95,7 +95,8 @@ test('the gates: rules in bounds, the validation bar, one step at a time, four e
   const quant = { kind: 'agent', id: 'q', name: 'Quinn', role: 'quant' } as const;
   const tester = { kind: 'agent', id: 'b', name: 'Bea', role: 'backtester' } as const;
   const s = { id: 'S-1', name: 'Trend', hypothesis: '', author: quant, owner: 'quant', universe: ['BTC'], rules: { kind: 'trend', params: { fast: 20, slow: 100 }, short: false }, stage: 'validation', history: [], createdAt: 0, updatedAt: 0 } as Strategy;
-  const ctx = (o: Partial<MoveContext>): MoveContext => ({ by: tester, role: 'backtester', canStrategy: true, canRule: false, latest: result(), bar: DEFAULT_BAR, realMarket: true, paperDays: 14, now: 30 * DAY, ...o });
+  const record = (o: Partial<PaperRecord>): PaperRecord => ({ proposals: 3, filled: 3, open: 0, closed: 3, wins: 2, realizedPnl: 200, grossProfit: 300, grossLoss: 100, returnPct: 2, maxDrawdown: 100, ...o });
+  const ctx = (o: Partial<MoveContext>): MoveContext => ({ by: tester, role: 'backtester', canStrategy: true, canRule: false, latest: result(), bar: DEFAULT_BAR, realMarket: true, paperDays: 14, paper: record({}), paperTrades: 3, paperProfitFactor: 1, now: 30 * DAY, ...o });
   assert.equal(checkMove(s, 'paper', ctx({})), undefined);
   assert.match(checkMove(s, 'paper', ctx({ by: quant, role: 'quant' }))!, /You wrote S-1: another desk \(or a person\) validates it/);
   assert.equal(checkMove(s, 'paper', ctx({ by: PEOPLE, role: undefined })), undefined, 'a person may');
@@ -107,6 +108,12 @@ test('the gates: rules in bounds, the validation bar, one step at a time, four e
   assert.match(checkMove(paper, 'approved', ctx({}))!, /Only a person approves/);
   assert.match(checkMove(paper, 'approved', ctx({ by: PEOPLE }))!, /on paper 10.0 days: it needs 14/);
   assert.equal(checkMove(paper, 'approved', ctx({ by: PEOPLE, now: 40 * DAY })), undefined);
+  // Its time on paper isn't enough: enough of its trades there must have closed, at a profit factor that clears the bar.
+  assert.match(checkMove(paper, 'approved', ctx({ by: PEOPLE, now: 40 * DAY, paper: record({ closed: 2 }) }))!, /S-1 has closed 2 trades on paper: it needs 3 before it's approved/);
+  assert.match(checkMove(paper, 'approved', ctx({ by: PEOPLE, now: 40 * DAY, paper: record({ grossProfit: 80 }) }))!, /S-1's profit factor on paper is 0.80: it needs 1 before it's approved/);
+  assert.equal(checkMove(paper, 'approved', ctx({ by: PEOPLE, now: 40 * DAY, paper: record({ closed: 0 }), paperTrades: 0 })), undefined, 'a person may ask for none');
+  assert.equal(paperProfitFactor(record({ grossLoss: 0 })), Infinity);
+  assert.equal(paperProfitFactor(record({ closed: 0 })), undefined);
   assert.match(checkMove(paper, 'retired', ctx({ canStrategy: true, role: 'backtester' }))!, /Only S-1's owner, the CIO or PM, or a person retires it/);
   assert.equal(checkMove(paper, 'retired', ctx({ by: quant, role: 'quant' })), undefined);
   assert.match(checkMove({ ...s, stage: 'backtest' }, 'validation', ctx({ latest: result({ years: 1 }) }))!, /tested 1 years: validation needs at least 2/);
@@ -130,7 +137,7 @@ test('a strategy through the lab: registered, backtested, validated by another d
       return out;
     },
   };
-  const { fund, dir, hire, as, last } = fundOffice({ now: () => now });
+  const { fund, dir, hire, as, last, prices } = fundOffice({ now: () => now });
   fund.strategies.history = new History(dir, () => now, [candles]);
   await fund.market.refreshAll();
   fund.desks.staff(hire('q', 'Quinn'), 'quant', PEOPLE);
@@ -173,6 +180,15 @@ test('a strategy through the lab: registered, backtested, validated by another d
   assert.ok('proposal' in p, JSON.stringify(p));
   assert.equal(fund.state().strategies[0].record.proposals, 1);
 
+  // A person approves it, it fills on paper and exits at its target: the strategy's record on paper says how it did.
+  assert.ok('proposal' in (await fund.approve(p.proposal.id, 'Go', PEOPLE)));
+  prices.BTC = 121_000;
+  await fund.market.refreshAll();
+  await fund.serial(() => {});
+  const rec = fund.state().strategies[0].record;
+  assert.deepEqual([rec.filled, rec.open, rec.closed, rec.wins, rec.grossLoss, rec.maxDrawdown, paperProfitFactor(rec)], [1, 0, 1, 1, 0, 0, Infinity]);
+  assert.ok(rec.realizedPnl > 9_000 && rec.returnPct > 19 && rec.returnPct < 21, `about 20% on the $50,000 it put to work: ${rec.realizedPnl}, ${rec.returnPct}%`);
+
   assert.match(err(lab.move(as('b'), { id: 'S-1', stage: 'approved' })), /Only a person approves/);
   assert.match(err(lab.move(PEOPLE, { id: 'S-1', stage: 'approved' })), /on paper 0.0 days: it needs 14/);
 
@@ -183,6 +199,9 @@ test('a strategy through the lab: registered, backtested, validated by another d
   assert.deepEqual(lab.get('S-1')!.signal, { BTC: -1 });
   assert.match(last('q'), /S-1 \(BTC momentum\)'s signal changed on today's closes: BTC short/);
   assert.match(fund.activity.list({ kind: 'strategy' }).at(-1)!.text, /S-1's signal changed: BTC short/);
+  // Two weeks is enough time, but one closed trade isn't enough of a record, until a person says it is.
+  assert.match(err(lab.move(PEOPLE, { id: 'S-1', stage: 'approved' })), /S-1 has closed 1 trade on paper: it needs 3 before it's approved/);
+  ok(await fund.setConfig({ strategyPaperTrades: 1 }, PEOPLE));
   ok(lab.move(PEOPLE, { id: 'S-1', stage: 'approved' }));
 
   assert.match(err(lab.move(as('t'), { id: 'S-1', stage: 'retired' })), /Only S-1's owner, the CIO or PM, or a person retires it/);

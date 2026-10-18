@@ -250,8 +250,8 @@ export class Fund {
     this.changed();
   }
 
-  /** A trade checked by the risk engine without proposing it: what would go ahead, and why. */
-  riskCheck(raw: unknown): Result<{ verdict: RiskVerdict }> {
+  /** A trade checked by the risk engine without proposing it: what would go ahead, and why. Who asked goes in the log. */
+  riskCheck(raw: unknown, by?: Actor): Result<{ verdict: RiskVerdict }> {
     this.market.touch();
     const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
     const symbol = cleanSymbol(r.symbol ?? r.asset);
@@ -260,7 +260,12 @@ export class Fund {
     const side: Side | undefined = dir === 'long' || dir === 'buy' ? 'long' : dir === 'short' || dir === 'sell' ? 'short' : undefined;
     if (!side) return { error: 'The direction is long or short' };
     const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined);
-    return { ok: true, verdict: this.verdict({ symbol, side, sizeUsd: num(r.sizeUsd ?? r.size) ?? 0, stop: num(r.stop), target: num(r.target) }) };
+    const v = this.verdict({ symbol, side, sizeUsd: num(r.sizeUsd ?? r.size) ?? 0, stop: num(r.stop), target: num(r.target) });
+    if (by) {
+      const said = v.decision === 'approved' ? 'it would go ahead' : v.decision === 'resized' ? `it would be resized to ${usd(v.approvedUsd)}` : 'it would be rejected';
+      this.log('risk', by, `Asked the risk engine about ${side} ${symbol} ${usd(v.requestedUsd)}: ${said}${v.reasons.length ? ` (${v.reasons.join('; ')})` : ''}`, { symbol });
+    }
+    return { ok: true, verdict: v };
   }
 
   /** A trade put forward, by an agent or a person. A full proposal goes straight to risk review; an idea waits for research. */
