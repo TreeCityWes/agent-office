@@ -92,6 +92,15 @@ const READS: Record<string, (a: Ask) => Answer> = {
     return ctx.fund.desks.memory(key);
   },
   inbox: ({ ctx, by }) => ctx.fund.desks.inbox(by),
+  committees({ ctx, by, q }) {
+    const c = ctx.fund.committees;
+    const id = str(q.get('id'), 20);
+    if (id) {
+      const found = c.get(id);
+      return found ? { committee: c.view(found, by) } : { error: `There's no committee ${id}` };
+    }
+    return { committees: c.state().map((x) => c.view(x, by)) };
+  },
   activity({ ctx, q }) {
     const limit = Math.min(200, Math.max(1, Number(q.get('limit')) || 50));
     return { events: ctx.fund.activity.list({ limit, proposalId: str(q.get('proposalId'), 20)?.toUpperCase(), symbol: list(q.get('symbol'))[0], kind: str(q.get('kind'), 20) as ActivityKind | undefined }) };
@@ -129,6 +138,22 @@ const ACTIONS: Record<string, (a: Ask) => Answer> = {
   message: ({ ctx, by, body }) => ctx.fund.desks.message(by, body, 'message'),
   assign: ({ ctx, by, body }) => ctx.fund.desks.message(by, body, 'assignment'),
   escalate: ({ ctx, by, body }) => ctx.fund.desks.escalate(by, body),
+  committee({ ctx, by, body }) {
+    const r = ctx.fund.committees.convene(by, body);
+    if ('committee' in r) ctx.fund.desks.decided(by, 'called', `committee ${r.committee.id}: ${r.committee.question}`, r.committee.proposalId);
+    return r;
+  },
+  'committee-close': ({ ctx, by, body }) => ctx.fund.committees.close(by, body.id),
+  ballot({ ctx, by, body }) {
+    const r = ctx.fund.committees.ballot(by, body);
+    if ('ballot' in r) ctx.fund.desks.decided(by, 'voted', `${r.ballot.vote} at ${r.ballot.confidence}% on ${r.committee.id}: ${r.ballot.argument}`, r.committee.proposalId);
+    return 'ballot' in r ? { ok: true, committee: ctx.fund.committees.view(r.committee, by), ballot: r.ballot } : r;
+  },
+  decide({ ctx, by, body }) {
+    const r = ctx.fund.committees.decide(by, body);
+    if ('committee' in r) ctx.fund.desks.decided(by, 'decided', `${r.committee.id}: ${r.committee.decision?.vote}. ${r.committee.decision?.summary}`, r.committee.proposalId);
+    return r;
+  },
 };
 
 /**

@@ -60,7 +60,7 @@ export interface Observation {
   proposalId?: string;
 }
 
-export type DecisionKind = 'proposed' | 'idea' | 'backed' | 'turned down' | 'withdrew' | 'reviewed' | 'voted';
+export type DecisionKind = 'proposed' | 'idea' | 'backed' | 'turned down' | 'withdrew' | 'reviewed' | 'called' | 'voted' | 'decided';
 
 export interface Decision {
   at: number;
@@ -188,14 +188,13 @@ export function findRole(key: string): RoleDef | undefined {
  * the desks and anyone's memory, keeps its own memory and status, messages the others, escalates and
  * reviews its own trades; proposing, ruling and assigning are by role. A worker with no role only looks.
  */
-export const FUND_TOOLS_ANYONE = ['fund_portfolio', 'fund_quotes', 'fund_market', 'fund_proposals', 'fund_activity', 'fund_risk_check', 'fund_desks', 'fund_memory'] as const;
-export const FUND_TOOLS_DESK = ['fund_status', 'fund_thesis', 'fund_observe', 'fund_message', 'fund_inbox', 'fund_escalate', 'fund_review'] as const;
+export const FUND_TOOLS_ANYONE = ['fund_portfolio', 'fund_quotes', 'fund_market', 'fund_proposals', 'fund_activity', 'fund_risk_check', 'fund_desks', 'fund_memory', 'fund_committees'] as const;
+export const FUND_TOOLS_DESK = ['fund_status', 'fund_thesis', 'fund_observe', 'fund_message', 'fund_inbox', 'fund_escalate', 'fund_review', 'fund_ballot'] as const;
 export const FUND_TOOLS_BY_PERMISSION: Record<Permission, readonly string[]> = {
   propose: ['fund_propose', 'fund_withdraw'],
   rule: ['fund_rule'],
   assign: ['fund_assign'],
-  // The investment committee's tool comes with the committee (docs/fund.md#the-plan, step 4).
-  committee: [],
+  committee: ['fund_committee', 'fund_committee_close', 'fund_decide'],
 };
 
 export function fundToolsFor(role: RoleDef | undefined): string[] {

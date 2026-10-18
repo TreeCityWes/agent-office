@@ -1,0 +1,51 @@
+/* The 💼 Fund window's Committee tab: each committee a card, its seats' ballots, the tally and the decision. */
+
+.fd-call { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 12px; background: var(--fd-panel); border: 1px solid var(--fd-line); border-radius: 6px; }
+.fd-call > .fd-hint { flex: 1; min-width: 260px; }
+.fd-call-form { flex: 1 1 100%; }
+.fd-seats-pick { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 12px var(--fd-mono); }
+.fd-seats-pick .fd-who { color: var(--fd-amber); }
+
+.fd-cmts { display: flex; flex-direction: column; gap: 10px; }
+.fd-cmt { border: 1px solid var(--fd-line); border-left: 3px solid #d4af37; border-radius: 4px; padding: 8px 12px; background: var(--fd-panel); font: 12.5px var(--fd-mono); }
+.fd-cmt.decided { border-left-color: var(--fd-up); }
+.fd-cmt.lapsed { border-left-color: #4b5866; opacity: .85; }
+.fd-cmt-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fd-cmt-head .grow { flex: 1; }
+.fd-cmt-q { color: #fff; font-weight: 700; }
+.fd-cmt-meta { color: var(--fd-muted); font-size: 11.5px; margin-top: 3px; }
+.fd-cmt-p { color: var(--fd-blue); }
+.fd-cstat { font-size: 10px; padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--fd-line); color: var(--fd-muted); }
+.fd-cstat.voting { color: var(--fd-amber); border-color: #5c4a10; }
+.fd-cstat.open { color: #fff; background: #5c4a10; border-color: var(--fd-amber); }
+.fd-cstat.decided { color: var(--fd-up); border-color: #1d4a31; }
+
+.fd-vote { display: inline-block; min-width: 38px; text-align: center; font: 800 11px var(--fd-mono); padding: 1px 6px; border-radius: 3px; letter-spacing: .06em; }
+.fd-vote.BUY { color: #04140b; background: var(--fd-up); }
+.fd-vote.HOLD { color: #1a1402; background: var(--fd-amber); }
+.fd-vote.SELL { color: #fff; background: var(--fd-down); }
+.fd-vote.big { font-size: 15px; padding: 4px 10px; align-self: flex-start; }
+
+.fd-tally { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.fd-tally-bar { flex: 1; min-width: 200px; display: flex; height: 16px; border-radius: 3px; overflow: hidden; background: #17212c; }
+.fd-tally-bar i { display: block; font: 700 10px/16px var(--fd-mono); font-style: normal; text-align: center; white-space: nowrap; overflow: hidden; }
+.fd-tally-bar i.BUY { background: #1f6b46; color: #d7ffe8; }
+.fd-tally-bar i.HOLD { background: #6b5410; color: #fff3c4; }
+.fd-tally-bar i.SELL { background: #7a1f2b; color: #ffd9de; }
+.fd-tally-sum { color: var(--fd-muted); font-size: 11.5px; }
+
+.fd-seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; margin-top: 8px; }
+.fd-seat { border: 1px solid var(--fd-line); border-radius: 4px; padding: 6px 8px; background: #070b10; display: flex; flex-direction: column; gap: 4px; }
+.fd-seat.waiting { opacity: .7; }
+.fd-seat.skeptic { border-color: #6b2b8a; box-shadow: inset 2px 0 0 #9b5de5; }
+.fd-seat-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fd-seat-head .grow { flex: 1; }
+.fd-ballot-arg { color: #c9d4de; font-size: 12px; line-height: 1.45; }
+.fd-ballot-list { margin: 0; padding-left: 16px; font-size: 11.5px; line-height: 1.4; }
+.fd-ballot-list.evidence { color: #8fb8e0; }
+.fd-ballot-list.risks { color: #e8a0aa; }
+.fd-ballot-list.evidence li::marker { content: '+ '; }
+.fd-ballot-list.risks li::marker { content: '! '; }
+
+.fd-decision { display: flex; gap: 10px; margin-top: 8px; padding: 8px 10px; border: 1px dashed #1d4a31; border-radius: 4px; background: #06110b; color: #c9d4de; line-height: 1.45; }
+.fd-decision b { color: #fff; }

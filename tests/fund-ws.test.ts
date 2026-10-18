@@ -8,6 +8,7 @@ import type { PriceAdapter } from '../src/server/fund/market/types.js';
 import type { Client } from '../src/server/office/client.js';
 import type { Ctx } from '../src/server/office/context.js';
 import { fundActivity, fundChanged, fundHandlers } from '../src/server/ws/handlers/fund.js';
+import { fundCommitteeHandlers } from '../src/server/ws/handlers/fund-committee.js';
 import type { ServerMsg } from '../src/shared/protocol.js';
 
 const idea = { symbol: 'BTC', side: 'long' as const, sizeUsd: 50_000, stop: 95_000, target: 120_000, thesis: 'ETF inflows and a funding reset point higher.', confidence: 70, horizon: '2w', evidence: ['ETF inflows 5 days running'] };
@@ -96,5 +97,17 @@ test('a closed window hears nothing more', async () => {
   assert.equal(of('boss', 'fund.activity').length, 1);
   fundHandlers['fund.brief'](ctx, boss, { t: 'fund.brief' });
   assert.deepEqual(of('boss', 'fund.brief').at(-1), { t: 'fund.brief', brief: { awaiting: 1, open: 0, halted: false } });
+  fund.stop();
+});
+
+test('only an admin calls or decides a committee from the window, and the fund says why it won’t', () => {
+  const { ctx, fund, boss, guest, warned } = office();
+  fundCommitteeHandlers['fund.convene'](ctx, guest, { t: 'fund.convene', question: 'Cut gross exposure?' });
+  assert.match(warned.get('guest')!.at(-1)!, /Only an admin/);
+  fundCommitteeHandlers['fund.convene'](ctx, boss, { t: 'fund.convene', question: 'Cut gross exposure?' });
+  assert.match(warned.get('boss')!.at(-1)!, /always seats the Skeptic/);
+  fundCommitteeHandlers['fund.decide'](ctx, boss, { t: 'fund.decide', id: 'C-9', vote: 'HOLD', summary: 'Nothing to decide here.' });
+  assert.match(warned.get('boss')!.at(-1)!, /committee \(C-1…\)/);
+  assert.equal(fund.state().committees.length, 0);
   fund.stop();
 });

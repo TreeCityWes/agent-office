@@ -24,6 +24,7 @@ export const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'agents', label: 'Agents' },
   { id: 'proposals', label: 'Proposals' },
+  { id: 'committee', label: 'Committee' },
   { id: 'risk', label: 'Risk' },
   { id: 'market', label: 'Market' },
   { id: 'activity', label: 'Activity' },
