@@ -83,7 +83,7 @@ export function checkProposalInput(raw: unknown, assets: ReadonlyMap<string, Ass
   }
   const catalyst = text(r.catalyst, LIMITS.catalyst);
   const dissent = text(r.dissent ?? r.dissentingView, LIMITS.dissent);
-  const strategyId = text(r.strategyId, 64);
+  const strategyId = text(r.strategyId, 64).toUpperCase();
   return {
     input: {
       symbol,

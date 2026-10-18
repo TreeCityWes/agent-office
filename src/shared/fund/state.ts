@@ -3,6 +3,7 @@
 import { checkAsset, cleanSymbol, DEFAULT_WATCHLIST } from './assets.js';
 import type { Committee } from './committee.js';
 import type { DesksState } from './desks.js';
+import { checkBar, DEFAULT_BAR, type Backtest, type StrategyView, type ValidationBar } from './strategy.js';
 import type { Actor, Asset, Fill, PortfolioView, Proposal, Quote, RiskLimits } from './types.js';
 
 /** The fund's settings, changed only by a person (⚙️ in the 💼 Fund window). */
@@ -23,6 +24,10 @@ export interface FundConfig {
   committeeOverPct: number;
   /** A proposal nobody decides on in this long expires. */
   proposalTtlHours: number;
+  /** What a strategy's backtest must show before it may trade on paper. */
+  validationBar: ValidationBar;
+  /** How long a strategy trades on paper before a person may approve it. */
+  strategyPaperDays: number;
 }
 
 export const DEFAULT_CONFIG: FundConfig = {
@@ -35,6 +40,8 @@ export const DEFAULT_CONFIG: FundConfig = {
   requireCio: true,
   committeeOverPct: 8,
   proposalTtlHours: 24,
+  validationBar: DEFAULT_BAR,
+  strategyPaperDays: 14,
 };
 
 /** The capital a new fund starts with, paid in by the office when the ledger is first made. */
@@ -75,6 +82,16 @@ export function checkConfig(raw: unknown, base: FundConfig = DEFAULT_CONFIG): { 
     const v = num(r.proposalTtlHours, 1, 24 * 30);
     if (v === undefined) return { error: 'proposalTtlHours is from 1 to 720' };
     out.proposalTtlHours = v;
+  }
+  if (r.validationBar !== undefined) {
+    const b = checkBar(r.validationBar, base.validationBar);
+    if ('error' in b) return b;
+    out.validationBar = b.bar;
+  }
+  if (r.strategyPaperDays !== undefined) {
+    const v = num(r.strategyPaperDays, 0, 365);
+    if (v === undefined) return { error: 'strategyPaperDays is from 0 to 365' };
+    out.strategyPaperDays = v;
   }
   if (r.assets !== undefined) {
     if (!Array.isArray(r.assets) || r.assets.length > 200) return { error: 'assets is a list of up to 200' };
@@ -180,6 +197,10 @@ export interface FundState {
   desks: DesksState;
   /** Committees still sitting, then the latest finished. */
   committees: Committee[];
+  /** The quant lab's strategies, newest first, each with its record on paper. */
+  strategies: StrategyView[];
+  /** The latest backtests, and each strategy's own (their trades cut to the latest). */
+  backtests: Backtest[];
   /** Why the fund isn't trading: its journals don't check out. */
   halted?: string;
   /** What was put right when the journals were read. */

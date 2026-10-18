@@ -5,9 +5,10 @@ import type { ActivityKind, Actor, Proposal } from '../../shared/fund/types.js';
 import type { WorkerInfo } from '../../shared/protocol.js';
 import type { Ctx } from '../office/context.js';
 import { readBody, send } from '../http/util.js';
+import { LAB_ACTIONS, LAB_READS } from './fund-lab.js';
 
 type Body = Record<string, unknown>;
-type Answer = object | Promise<object>;
+export type Answer = object | Promise<object>;
 
 const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
 const list = (v: string | null) => (v ? v.split(/[\s,]+/).map((s) => s.trim().toUpperCase()).filter(Boolean).slice(0, 40) : []);
@@ -29,7 +30,7 @@ const line = (p: Proposal) => ({
 });
 
 /** What every tool reads: the fund, the worker asking, who it is to the fund, and what it sent. */
-interface Ask {
+export interface Ask {
   ctx: Ctx;
   me: WorkerInfo;
   by: Actor;
@@ -105,6 +106,7 @@ const READS: Record<string, (a: Ask) => Answer> = {
     const limit = Math.min(200, Math.max(1, Number(q.get('limit')) || 50));
     return { events: ctx.fund.activity.list({ limit, proposalId: str(q.get('proposalId'), 20)?.toUpperCase(), symbol: list(q.get('symbol'))[0], kind: str(q.get('kind'), 20) as ActivityKind | undefined }) };
   },
+  ...LAB_READS,
 };
 
 /** After a fund action an agent took: on its role's record when it went through. */
@@ -154,6 +156,7 @@ const ACTIONS: Record<string, (a: Ask) => Answer> = {
     if ('committee' in r) ctx.fund.desks.decided(by, 'decided', `${r.committee.id}: ${r.committee.decision?.vote}. ${r.committee.decision?.summary}`, r.committee.proposalId);
     return r;
   },
+  ...LAB_ACTIONS,
 };
 
 /**

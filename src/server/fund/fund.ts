@@ -13,6 +13,7 @@ import { ActivityLog, Ledger, NavHistory, ProposalRecords } from './records.js';
 import { Committees } from './committee.js';
 import { Desks, type FundOffice } from './desks.js';
 import { closePosition as runClose, exitProposal as runExit } from './exits.js';
+import { Strategies } from './strategies.js';
 import { PaperVenue, type ExecutionVenue } from './venue.js';
 
 export type Result<T extends object = object> = ({ ok: true } & T) | { error: string };
@@ -55,6 +56,7 @@ export class Fund {
   activity!: ActivityLog;
   desks!: Desks;
   committees!: Committees;
+  strategies!: Strategies;
   readonly market: MarketData;
   readonly venue: ExecutionVenue;
   readonly now: () => number;
@@ -84,6 +86,8 @@ export class Fund {
     this.desks.adopt(staffed);
     this.committees?.stop();
     this.committees = new Committees(this, this.opts.dir);
+    this.strategies?.stop();
+    this.strategies = new Strategies(this, this.opts.dir);
     this.activity = new ActivityLog(this.opts.dir, (e) => {
       this.opts.onActivity?.(e);
       this.desks.heard(e);
@@ -115,6 +119,7 @@ export class Fund {
     this.market.stop();
     this.desks.stop();
     this.committees.stop();
+    this.strategies.stop();
     clearInterval(this.timer);
     clearTimeout(this.changeTimer);
   }
@@ -123,7 +128,7 @@ export class Fund {
 
   /** Why the fund isn't trading, when one of its journals doesn't check out. */
   halted(): string | undefined {
-    for (const [name, r] of [['ledger', this.ledger], ['proposals', this.proposals], ['NAV', this.nav], ['activity', this.activity], ['committees', this.committees]] as const)
+    for (const [name, r] of [['ledger', this.ledger], ['proposals', this.proposals], ['NAV', this.nav], ['activity', this.activity], ['committees', this.committees], ['strategies', this.strategies]] as const)
       if (r.problem) return `The fund's ${name} journal doesn't check out (${r.problem}), so trading has stopped. See docs/fund.md#audit.`;
     return undefined;
   }
@@ -162,8 +167,9 @@ export class Fund {
       nav: this.nav.points.slice(-500),
       desks: this.desks.state(),
       committees: this.committees.state(),
+      ...this.strategies.state(),
       ...(halted ? { halted } : {}),
-      notes: [this.ledger, this.proposals, this.nav, this.activity, this.committees].flatMap((r) => (r.repaired ? [r.repaired] : [])),
+      notes: [this.ledger, this.proposals, this.nav, this.activity, this.committees, this.strategies].flatMap((r) => (r.repaired ? [r.repaired] : [])),
     };
   }
 
@@ -258,6 +264,8 @@ export class Fund {
       if (!this.can(by, 'propose')) return this.refuse(by, 'propose trades');
       const c = checkProposalInput(raw, this.assets(), opts);
       if ('error' in c) return c;
+      const off = this.strategies.offSignal(c.input);
+      if (off) return { error: off };
       this.market.touch();
       const now = this.now();
       const id = `P-${this.proposals.list().length + 1}`;
@@ -280,6 +288,8 @@ export class Fund {
       if (by.kind === 'agent' && by.id !== found.author.id && !this.can(by, 'propose')) return this.refuse(by, 'propose trades');
       const c = checkProposalInput({ ...found, ...(raw && typeof raw === 'object' ? raw : {}) }, this.assets());
       if ('error' in c) return c;
+      const off = this.strategies.offSignal(c.input);
+      if (off) return { error: off };
       let p = this.move({ ...found, ...c.input }, 'proposed', by);
       this.log('proposal', by, `Proposed ${p.id}: ${p.side} ${p.symbol} ${usd(p.sizeUsd, { compact: true })}`, { proposalId: p.id, symbol: p.symbol });
       p = this.riskReview(p);

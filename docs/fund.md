@@ -34,7 +34,7 @@ Six layers, each depending only on the ones under it:
         │  WebSocket: fund.* messages (shared/protocol/fund.ts)
  Agent runtime              server/workers/, providers/, hooks/ — unchanged
         │  MCP tools → /fund/* on the loopback hook server, per-worker token
- Fund services              server/fund/fund.ts: proposals, desks, memory, committee
+ Fund services              server/fund/fund.ts: proposals, desks, memory, committee, the quant lab
         │
  Portfolio & risk           shared/fund/book.ts, risk.ts (pure) · server/fund/venue.ts, exits.ts
         │
@@ -61,7 +61,7 @@ Every desk agent is a worker (a real session) with a **role** from the catalog i
 | 🧪 Quant lab | Quant Researcher, Strategy Researcher, Backtester, Factor Analyst, Data Scientist |
 | 🛡️ Risk | Portfolio Risk, Market Risk, Liquidity Risk, Trade Auditor, Compliance |
 
-A role has a brief (what the agent is for and what it produces), a focus, and **permissions**: which fund tools it may call. Most roles propose trades. The Skeptic, the Execution Trader, the Backtester, the Data Scientist and the risk desks don't: they read, watch, write down what they see and message the desks that do. Only the CIO and PM rule on proposals; the CIO, PM and Chief Risk Officer hand out work; risk agents explain the risk engine's verdicts but can't override them; nobody's tools reach the risk limits or the books.
+A role has a brief (what the agent is for and what it produces), a focus, and **permissions**: which fund tools it may call. Most roles propose trades. The Skeptic, the Execution Trader, the Backtester, the Data Scientist and the risk desks don't: they read, watch, write down what they see and message the desks that do. Only the CIO and PM rule on proposals; the CIO, PM and Chief Risk Officer hand out work; the CIO, PM, Quant Researcher, Strategy Researcher and Backtester work on [the lab's strategies](#strategies-and-backtests); risk agents explain the risk engine's verdicts but can't override them; nobody's tools reach the risk limits or the books.
 
 Each staffed role has a **desk profile** (`DeskProfile`): role, department, the fund status the agent reports (`idle`, `researching`, `analyzing`, `backtesting`, `proposing`, `waiting`, `blocked`, `monitoring`, `finished`), its current assignment, thesis and confidence, and its track record (what it proposed, what filled, wins and losses, realized P&L). That sits beside the worker's process status (`working`, `needs_input`…), which the office already knows from hooks.
 
@@ -127,7 +127,7 @@ It only asks while it's needed: for ten minutes after anyone opens the fund or a
 
 ### Audit
 
-The fund keeps five append-only JSONL journals in the office's data folder, `~/agent-office/.agent-office/fund/`, outside every project checkout the agents work in. Each line carries the hash of the one before:
+The fund keeps seven append-only JSONL journals in the office's data folder, `~/agent-office/.agent-office/fund/`, outside every project checkout the agents work in. Each line carries the hash of the one before:
 
 | Journal | What's in it |
 | --- | --- |
@@ -135,7 +135,11 @@ The fund keeps five append-only JSONL journals in the office's data folder, `~/a
 | `proposals.jsonl` | each proposal as it went through each stage |
 | `nav.jsonl` | the NAV over time, with the day's start and the high-water mark |
 | `committees.jsonl` | each investment committee as it went: called, every ballot, opened, decided or lapsed |
-| `activity.jsonl` | every proposal, risk verdict, ruling, approval, fill, exit, limit change, committee step and review, with who did it |
+| `strategies.jsonl` | each quant lab strategy as it changed: registered, edited, every move from stage to stage, every new signal |
+| `backtests.jsonl` | every backtest: its rules, universe, costs, results, and the source, range and hash of the prices it ran on |
+| `activity.jsonl` | every proposal, risk verdict, ruling, approval, fill, exit, limit change, committee step, strategy move, backtest and review, with who did it |
+
+The daily prices the backtests ran on are cached beside them in `history/`, for half a day; they're not a record, and the hash in each backtest says which prices it used.
 
 Nothing is written until the fund is first used. The office checks every chain when it starts. A line cut short when the office stopped mid-write is dropped and noted; anything else that doesn't match (a line edited, removed or added by hand) stops the fund from trading, and the 💼 Fund window says which journal and which line, rather than trading on a book someone edited. To carry on, a person starts the fund over, which moves the old records aside to `fund-<time>/` rather than deleting them.
 
@@ -143,7 +147,7 @@ The chain makes tampering evident, not impossible: the agents run as the same us
 
 ## The 💼 Fund window
 
-**☰ → 💼 Fund** opens the fund over the office, as a trading terminal. Along the top: the NAV, the day's P&L, the total return, the drawdown, the leverage, and whether prices are coming in (**LIVE DATA**, **DATA IDLE** or **MOCK DATA**). Badges say what you're looking at: **PAPER** always, **MOCK MARKET** on simulated prices, **HALTED** when a journal didn't check out. Keys **1**–**8** turn to a tab:
+**☰ → 💼 Fund** opens the fund over the office, as a trading terminal. Along the top: the NAV, the day's P&L, the total return, the drawdown, the leverage, and whether prices are coming in (**LIVE DATA**, **DATA IDLE** or **MOCK DATA**). Badges say what you're looking at: **PAPER** always, **MOCK MARKET** on simulated prices, **HALTED** when a journal didn't check out. Keys **1**–**9** and **0** turn to a tab:
 
 | Tab | What's on it |
 | --- | --- |
@@ -151,12 +155,14 @@ The chain makes tampering evident, not impossible: the agents run as the same us
 | Agents | Every role by department, staffed or vacant. A staffed desk shows its agent, what its process is doing and the status it reports, its assignment, thesis and confidence, and its record; **Memory** opens its thesis history, observations and decisions. Staff a vacant desk with an agent already at work or a new hire; **Hire** on the team bar staffs whichever of the core team (the CIO, the Macro and Crypto Analysts, the Quant Researcher and the Skeptic) is missing, in one go. Assign a task, send a message or release a desk. Underneath, the messages between the desks |
 | Proposals | Waiting on your approval, with the CIO, open trades, ideas and research, finished. Each shows its thesis, catalyst, evidence and dissent, every risk check with its numbers, the CIO's and the person's rulings, its fill, its exit and review, and its history. Approve or reject it with a note for the record, or exit an open trade now. **Propose a trade yourself** goes through the same risk engine as an agent's. A proposal a committee sat on says how it went |
 | Committee | [Investment committees](#the-investment-committee), sitting and decided. Each shows its question and proposal, its seats (the Skeptic marked 😈) and who has voted, then, once the ballots are open, every ballot with its argument, evidence and risks, the tally and the decision. **Call a committee** puts a question or a proposal to the desks you tick, the Skeptic always among them. Open the ballots early, or decide one that waits on a person (or over its chair) |
+| Strategies | The [quant lab's](#strategies-and-backtests) board: every strategy by stage (Idea, Research, Backtest, Validation, Paper trading, Approved, and Retired below) with its rules, universe and owner; its latest backtest (open it in Backtests) and whether that clears the validation bar; its signal and record on paper; its hypothesis, checks and history. **Register a strategy**, backtest one, move it to its next stage (the card says what its gate is waiting for), send it back to research or retire it |
+| Backtests | **Run a backtest**, of a strategy or of rules tried out there. Every run with its Sharpe, out-of-sample Sharpe, CAGR, drawdown, profit factor, trades and whether it clears the bar; the one picked in full: its equity against buying and holding (log scale, out of sample shaded), the drawdown, the numbers in and out of sample, the bar's checks, its position now, its latest trades and the prices it ran on (source, range and hash) |
 | Risk | The book against each limit, exposure by correlation group, and the limits themselves, to change |
 | Market | Every price with its source and age (**MOCK** marked, a price too old to trade on in red), the latest signals, and how each source is doing |
-| Activity | The fund's own log, by kind: every proposal, verdict, ruling, committee step, fill, exit, limit change and review, and every thesis, observation, status, assignment, message and escalation from the desks, with who did it |
-| Settings | The fund's name, fee and slippage, its market data (public or mock), whether a CIO or PM rules first, how long a proposal waits, how big a proposal must be (as a % of NAV) before an agent CIO needs a committee; paying capital in or taking it out; starting over |
+| Activity | The fund's own log, by kind: every proposal, verdict, ruling, committee step, strategy move, backtest, fill, exit, limit change and review, and every thesis, observation, status, assignment, message and escalation from the desks, with who did it |
+| Settings | The fund's name, fee and slippage, its market data (public or mock), whether a CIO or PM rules first, how long a proposal waits, how big a proposal must be (as a % of NAV) before an agent CIO needs a committee; the quant lab's validation bar and days on paper before a person may approve a strategy; paying capital in or taking it out; starting over |
 
-Anyone in the office can watch. Only admins act: approve, reject, exit, close, propose, call and decide committees, staff and release desks, assign and message them, change the limits or settings, move capital or start over. The office checks that itself, not the window (everyone on the shared password is an admin; with [accounts](../README.md#add-users), a Member only watches). When a trade waits on a person, or the fund has halted, a 💼 chip on the top bar says so to everyone in the building, with how many.
+Anyone in the office can watch. Only admins act: approve, reject, exit, close, propose, call and decide committees, register, backtest and move strategies, staff and release desks, assign and message them, change the limits or settings, move capital or start over. The office checks that itself, not the window (everyone on the shared password is an admin; with [accounts](../README.md#add-users), a Member only watches). When a trade waits on a person, or the fund has halted, a 💼 chip on the top bar says so to everyone in the building, with how many.
 
 The window only watches while it's open: it keeps prices coming while you look, and lets go when you close it (**✕** or **Esc**, straight back to looking around).
 
@@ -191,12 +197,15 @@ What an agent at a desk can call, from its `agent-office` MCP server, or from th
 | `fund_status`, `fund_thesis`, `fund_observe` | a desk | report its status, change its thesis and confidence, write down what it saw |
 | `fund_message`, `fund_inbox`, `fund_escalate` | a desk | message another desk, read what came in, escalate to the CIO and the room |
 | `fund_review` | a desk | the post-trade review of its own exited trade |
-| `fund_propose`, `fund_withdraw` | roles that propose | propose a trade or an idea (or fill an idea in), withdraw its own |
+| `fund_propose`, `fund_withdraw` | roles that propose | propose a trade or an idea (or fill an idea in), under a strategy on paper with its `strategyId`; withdraw its own |
 | `fund_rule` | CIO, PM | back or reject a proposal at CIO review |
 | `fund_assign` | CIO, PM, CRO | hand a desk a task |
 | `fund_committees` | anyone | the committees sitting and the latest finished, or one in full (while it votes, only your own ballot) |
 | `fund_ballot` | a seated desk | cast or revise its BUY / HOLD / SELL ballot |
 | `fund_committee`, `fund_committee_close`, `fund_decide` | CIO, PM | call a committee, open its ballots early, decide it |
+| `fund_strategies`, `fund_backtests`, `fund_history` | anyone | the lab's strategies (or one in full, with the validation bar's checks), its backtests (or one with its curve, trades and the prices it ran on), an asset's daily closes |
+| `fund_backtest` | a desk | backtest a strategy's rules, or rules and a universe given here |
+| `fund_strategy`, `fund_strategy_stage` | CIO, PM, Quant and Strategy Researchers, Backtester | register or edit a strategy, move it through the lifecycle |
 
 None of them approves a trade, changes a limit or touches the books: a person approves, and approving runs risk again.
 
@@ -211,6 +220,44 @@ When a decision is bigger than one desk, the CIO or PM (with `fund_committee`), 
 
 A committee advises: it never places, sizes or approves a trade. One rule about it is code: an agent CIO or PM can't rule on a proposal bigger than **8% of NAV** (a setting; 0 turns it off) until a committee has decided on it, and is told so when it's asked to rule. People are never held to it. Every committee, ballot and decision is in `committees.jsonl` (see [Audit](#audit)) and the activity log, and each desk's part (`called`, `voted`, `decided`) goes in its memory.
 
+## Strategies and backtests
+
+The quant lab keeps the fund's systematic strategies (`S-1`, `S-2`…), each a set of rules in code rather than an agent's judgment, and the backtests behind them (`B-1`, `B-2`…). The Quant Researcher, the Strategy Researcher, the CIO and the PM register strategies (`fund_strategy`) and walk them through a fixed lifecycle (`fund_strategy_stage`); the Backtester validates other desks' strategies; any desk can run a backtest (`fund_backtest`) and read the lab (`fund_strategies`, `fund_backtests`, `fund_history`). People do all of it from the Strategies and Backtests tabs.
+
+**The rules.** A strategy is a kind with its params, a universe of up to 12 of the fund's assets (equally weighted), whether it may go short, and an optional volatility target (each position scaled to that annualized volatility over the last 20 days, never above full size). The kinds, in `shared/fund/strategy.ts`:
+
+| Kind | Params (defaults) | Positions |
+| --- | --- | --- |
+| `trend` | fast, slow (20, 100 days) | long while the fast moving average is above the slow one; short below it, if shorts are allowed |
+| `momentum` | lookback, threshold (90 days, 0%) | long when the return over the lookback beats the threshold; short when it's below minus the threshold |
+| `mean-reversion` | window, entry, exit (20 days, z 2, z 0.5) | buys a close stretched below its average and sells it back near the average; the mirror image short |
+| `breakout` | entry, exit (55, 20 days) | long on a close above the entry window's highest close, out on one below the exit window's lowest; the mirror image short |
+| `buy-hold` | none | always long: the yardstick |
+
+A new kind is one entry in that list; the tests check every kind never looks ahead.
+
+**The backtest** (`shared/fund/backtest.ts`, pure and deterministic) runs on daily closes. Each position is decided at a close from that close and the ones before it, never a later one, and held to the next close. Costs, never less than the paper venue's fee plus slippage, are charged on every change of position. It reports the whole period, the first 70% (in sample), the last 30% (out of sample, the part to trust) and buying and holding the same assets: total return, CAGR, volatility, Sharpe and Sortino (annualized, against no risk-free rate), max drawdown and the longest time under water, Calmar, closed trades, win rate, profit factor, average trade, turnover a year and exposure. It tests five years of history by default, or the validation bar's if that's longer (1 to 15).
+
+**The prices** come from the same free sources as the fund's quotes: Coinbase's daily candles for crypto, Yahoo Finance for listed assets, or in the mock market a seeded simulation, marked **MOCK** wherever it shows. They're cached in the fund's folder (`history/`) for half a day. Every backtest records each series' source, range, number of closes and a hash of them, so a run can be repeated and checked. A source that fails says so; the lab never quietly falls back to made-up prices.
+
+**The lifecycle** has a gate in code at each step (`checkMove`):
+
+```
+idea → research → backtest → validation → paper → approved
+  └──────────── back to research, or retired, from any of them ────────────┘
+```
+
+- **Backtest** needs a backtest of its rules as they are now, and **validation** one over enough history (2 years by default).
+- **Paper** needs a backtest of its current rules that clears the **validation bar**, and **four eyes**: the desk that wrote or owns a strategy can't put it on paper; another lab desk (usually the Backtester) or a person does. The bar, by default: 2 years tested, 10 closed trades, an out-of-sample Sharpe of 0.5, a max drawdown of 30% at most and a profit factor of 1.1, all on real prices when the fund trades on real ones.
+- **Approved** is a person's call alone, after its days on paper (14 by default).
+- Its rules can change until it's on paper; changing them in validation sends it back to backtest. Back in research, a strategy loses its signal and its time on paper starts again. Its owner, the CIO or PM, or a person retires it.
+
+The bar and the days on paper are in ⚙️ Settings, for people only.
+
+**On paper**, a strategy has a **signal**: the position its rules hold on each of its assets after the latest close, worked out again on fresh closes about once a day. When it flips, the activity log says so and the strategy's owner desk is told, with the open trades under it. A desk proposes a trade under a strategy with `fund_propose` and its `strategyId`. The fund refuses one the signal doesn't back: a long while it's flat or short, an asset outside its universe, or a strategy not on paper. Those trades then go through risk and a person's approval like any other, since a strategy never places, sizes or approves a trade itself. Each strategy's card shows its record on paper: proposed, open, closed, won and realized P&L.
+
+Every strategy as it changed is in `strategies.jsonl`, and every backtest in `backtests.jsonl`, both hash-chained (see [Audit](#audit)). The moves and runs are in the activity log, and each desk's part (`strategy`, `backtested`) goes in its memory.
+
 ## The plan
 
 Each step is a pull request that leaves the office working.
@@ -221,7 +268,7 @@ Each step is a pull request that leaves the office working.
 2. **Dashboards** ✅ — the fund's messages (`shared/protocol/fund.ts`) and their handlers (`server/ws/handlers/fund.ts`, where the admin check lives), the state slice, and [the 💼 Fund window](#the--fund-window) with its chip on the top bar.
 3. **Agents at the desks** ✅ — [staffing a role](#agents-at-the-desks) (brief, permissions, memory folder, the sign over its desk), [the fund's tools](#the-fund-tools) on the agents' MCP server and the `office-fund` command, messages, assignments and escalations between the desks, the desk profiles, and the Agents tab.
 4. **The investment committee** ✅ — [committees](#the-investment-committee) (`shared/fund/committee.ts`, `server/fund/committee.ts`): sealed BUY / HOLD / SELL ballots with confidence, argument, evidence and risks, the Skeptic always seated, a confidence-weighted tally, the chair's decision, the size gate on an agent CIO's ruling, the committee tools, and the Committee tab.
-5. **Strategies and backtests** — the strategy registry (idea → research → backtest → validation → paper → approved → retired), a backtest service (Sharpe, drawdown, win rate, profit factor, turnover), and their tabs.
+5. **Strategies and backtests** ✅ — [the quant lab](#strategies-and-backtests): strategy kinds as rules in code and a deterministic backtest engine with no look-ahead, costs and an out-of-sample split (`shared/fund/strategy.ts`, `backtest.ts`); daily price history from the public sources or the mock market, hashed (`server/fund/history.ts`); the strategy registry and its gated lifecycle, the validation bar, four eyes, signals on paper that a strategy's trades must follow (`server/fund/strategies.ts`); the lab tools; and the Strategies and Backtests tabs.
 6. **The trading floor** — the map: desks grouped by department with their signs, ticker walls and portfolio and risk screens, the CIO's office, the committee room, and a risk event you can see from across the floor.
 
 **Phase 2**: confidence over time and performance scores per desk, research requests that track their answers, and agents that pick work up on a schedule.

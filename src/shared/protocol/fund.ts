@@ -2,6 +2,7 @@
 import type { Vote } from '../fund/committee.js';
 import type { DeskMemory } from '../fund/desks.js';
 import type { FundConfig, FundState } from '../fund/state.js';
+import type { BacktestRequest, StrategyInput, StrategyStage } from '../fund/strategy.js';
 import type { AgentEffort, AgentProvider } from './agents.js';
 import type { ActivityEvent, ProposalInput, RiskLimits } from '../fund/types.js';
 
@@ -35,7 +36,8 @@ export type FundClientMsg =
   /** Start the fund over; its records are moved aside, not deleted. */
   | { t: 'fund.reset' }
   | FundDeskClientMsg
-  | FundCommitteeClientMsg;
+  | FundCommitteeClientMsg
+  | FundLabClientMsg;
 
 /** Staffing the fund's desks, and talking to them (ws/handlers/fund-desks.ts). */
 export type FundDeskClientMsg =
@@ -58,6 +60,12 @@ export type FundCommitteeClientMsg =
   /** Open the ballots now, counting whoever hasn't voted as abstaining. */
   | { t: 'fund.committee.close'; id: string }
   | { t: 'fund.decide'; id: string; vote: Vote; summary: string };
+
+/** The quant lab, from the window (ws/handlers/fund-lab.ts). Approving a strategy is a person's alone. */
+export type FundLabClientMsg =
+  | { t: 'fund.strategy'; strategy: StrategyInput }
+  | { t: 'fund.strategy.stage'; id: string; stage: StrategyStage; note?: string }
+  | { t: 'fund.backtest'; run: BacktestRequest };
 
 export type FundServerMsg =
   | { t: 'fund.brief'; brief: FundBrief }

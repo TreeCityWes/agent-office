@@ -323,6 +323,8 @@ export type ActivityKind =
   | 'message'
   | 'escalation'
   | 'committee'
+  | 'strategy'
+  | 'backtest'
   | 'review'
   | 'system';
 
