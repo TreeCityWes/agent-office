@@ -487,7 +487,18 @@ export interface PaperRecord {
   returnPct: number;
   /** The deepest its realized P&L fell from its high, closed trade by closed trade, in USD. */
   maxDrawdown: number;
+  /**
+   * Its closed trades' returns, their mean over their spread, scaled to a year by how many it closes
+   * a year; against a zero risk-free rate, as a backtest's. Undefined until two have closed.
+   */
+  sharpe?: number;
+  /** How many times a year it turns over what it puts to work, entries and exits both, as a backtest's. */
+  turnover?: number;
 }
+
+const YEAR_MS = 365.25 * 86_400_000;
+/** The shortest time its trades are counted over, so a few quick ones aren't scaled up to a year. */
+const MIN_SPAN_MS = 30 * 86_400_000;
 
 /** Gross profit over gross loss on its closed paper trades: Infinity with no losers, undefined with none closed. */
 export function paperProfitFactor(r: PaperRecord): number | undefined {
@@ -498,14 +509,18 @@ export function paperProfitFactor(r: PaperRecord): number | undefined {
 /** How the trades proposed under strategy `id` have done. */
 export function paperRecord(proposals: readonly Proposal[], id: string): PaperRecord {
   const r: PaperRecord = { proposals: 0, filled: 0, open: 0, closed: 0, wins: 0, realizedPnl: 0, grossProfit: 0, grossLoss: 0, returnPct: 0, maxDrawdown: 0 };
-  const closed: { at: number; pnl: number; put: number }[] = [];
+  const closed: { from: number; at: number; pnl: number; put: number; out: number }[] = [];
   for (const p of proposals) {
     if (p.strategyId !== id) continue;
     r.proposals++;
     if (p.entryFill) r.filled++;
     if (p.stage === 'executing' || p.stage === 'monitoring') r.open++;
-    if ((p.stage === 'exited' || p.stage === 'reviewed') && p.pnl !== undefined)
-      closed.push({ at: p.history.find((h) => h.stage === 'exited')?.at ?? p.updatedAt, pnl: p.pnl, put: Math.abs((p.qty ?? 0) * (p.entryPrice ?? 0)) });
+    if ((p.stage === 'exited' || p.stage === 'reviewed') && p.pnl !== undefined) {
+      const at = p.history.find((h) => h.stage === 'exited')?.at ?? p.updatedAt;
+      const from = p.history.find((h) => h.stage === 'executing' || h.stage === 'monitoring')?.at ?? at;
+      const qty = Math.abs(p.qty ?? 0);
+      closed.push({ from, at, pnl: p.pnl, put: qty * (p.entryPrice ?? 0), out: qty * (p.exitPrice ?? p.entryPrice ?? 0) });
+    }
   }
   let put = 0;
   let high = 0;
@@ -521,6 +536,13 @@ export function paperRecord(proposals: readonly Proposal[], id: string): PaperRe
     r.maxDrawdown = Math.max(r.maxDrawdown, high - r.realizedPnl);
   }
   r.returnPct = put > 0 ? (r.realizedPnl / put) * 100 : 0;
+  if (!closed.length || put <= 0) return r;
+  const years = Math.max(MIN_SPAN_MS, Math.max(...closed.map((t) => t.at)) - Math.min(...closed.map((t) => t.from))) / YEAR_MS;
+  const rets = closed.filter((t) => t.put > 0).map((t) => t.pnl / t.put);
+  const m = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const sd = rets.length > 1 ? Math.sqrt(rets.reduce((a, b) => a + (b - m) ** 2, 0) / (rets.length - 1)) : 0;
+  if (sd > 0) r.sharpe = Math.round((m / sd) * Math.sqrt(rets.length / years) * 100) / 100;
+  r.turnover = Math.round((closed.reduce((a, t) => a + t.put + t.out, 0) / (put / closed.length) / years) * 100) / 100;
   return r;
 }
 

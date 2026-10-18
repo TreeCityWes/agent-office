@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { simulate, type Bar } from '../src/shared/fund/backtest.js';
-import { checkMove, checkRules, DEFAULT_BAR, offSignal, paperProfitFactor, positionsFor, STRATEGY_KINDS, validate, type Backtest, type MoveContext, type PaperRecord, type Strategy } from '../src/shared/fund/strategy.js';
+import { checkMove, checkRules, DEFAULT_BAR, offSignal, paperProfitFactor, paperRecord, positionsFor, STRATEGY_KINDS, validate, type Backtest, type MoveContext, type PaperRecord, type Strategy } from '../src/shared/fund/strategy.js';
+import type { Proposal } from '../src/shared/fund/types.js';
 import { History, type HistorySource } from '../src/server/fund/history.js';
 import { handleMcp } from '../bin/office-workers.js';
 import { fundOffice, PEOPLE, toolServer, trade } from './fund-office.js';
@@ -275,4 +276,22 @@ test('the lab through office-fund: every desk reads it and backtests, the lab de
   assert.deepEqual(kinds('quant'), ['strategy', 'strategy']);
   assert.deepEqual(kinds('macro'), ['backtested']);
   fund.stop();
+});
+
+test('a strategy’s paper record has its Sharpe and turnover, measured as a backtest’s', () => {
+  const YEAR = 365.25 * DAY;
+  // A trade of $10,000 under S-9, filled at `from` and closed at `to` at `exit`, fees in its P&L.
+  const closed = (from: number, to: number, exit: number) =>
+    ({ strategyId: 'S-9', stage: 'reviewed', entryFill: 'F', qty: 1, entryPrice: 10_000, exitPrice: exit, pnl: exit - 10_000, history: [{ stage: 'monitoring', at: from }, { stage: 'exited', at: to }], updatedAt: to }) as unknown as Proposal;
+  // +10%, -5% and +4% over a year: three trades a year, each in and out of $10,000.
+  const r = paperRecord([closed(0, 30 * DAY, 11_000), closed(100 * DAY, 130 * DAY, 9_500), closed(200 * DAY, YEAR, 10_400)], 'S-9');
+  // Mean 3% over a spread of 7.55%, times the square root of 3 a year.
+  assert.equal(r.sharpe, 0.69);
+  // $60,900 traded over the $10,000 each put to work, in one year.
+  assert.equal(r.turnover, 6.09);
+  // One trade has no spread, so no Sharpe; and a quick one is counted over a month, not scaled up to a year.
+  const one = paperRecord([closed(0, DAY, 11_000)], 'S-9');
+  assert.equal(one.sharpe, undefined);
+  assert.equal(one.turnover, Math.round(((10_000 + 11_000) / 10_000 / (30 / 365.25)) * 100) / 100);
+  assert.deepEqual([paperRecord([], 'S-9').sharpe, paperRecord([], 'S-9').turnover], [undefined, undefined]);
 });

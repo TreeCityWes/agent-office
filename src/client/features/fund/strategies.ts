@@ -94,7 +94,7 @@ export function strategiesTab(deps: TabDeps): FundTab {
             'button',
             { type: 'button', class: 'fd-strat-bt', title: `Open ${b.id} in Backtests`, onclick: () => (showBacktest(b.id), deps.go('backtests')) },
             h('b', {}, b.id),
-            ` Sharpe ${b.metrics.sharpe.toFixed(2)} · OOS ${b.outOfSample.sharpe.toFixed(2)} · DD ${b.metrics.maxDrawdownPct.toFixed(0)}% · ${b.metrics.trades} trades`,
+            ` Sharpe ${b.metrics.sharpe.toFixed(2)} · OOS ${b.outOfSample.sharpe.toFixed(2)} · DD ${b.metrics.maxDrawdownPct.toFixed(0)}% · ${b.metrics.trades} trades · turnover ${b.metrics.turnover.toFixed(1)}×/yr`,
             v ? h('span', { class: v.passed ? 'fd-pass' : 'fd-fail' }, v.passed ? ' ✔ clears the bar' : ` ✖ ${v.checks.filter((k) => !k.ok).length} short of the bar`) : null,
             b.mock ? h('span.fd-mock', {}, ' MOCK') : null,
           )
@@ -113,10 +113,12 @@ export function strategiesTab(deps: TabDeps): FundTab {
   return { el, update };
 }
 
-/** Its closed paper trades' performance: profit factor, return on what they put to work, drawdown. */
+/** Its closed paper trades' performance: profit factor, return on what they put to work, Sharpe, drawdown, turnover. */
 function paperLine(r: PaperRecord): string {
   const pf = paperProfitFactor(r)!;
-  return `Paper: profit factor ${pf === Infinity ? '∞' : pf.toFixed(2)} · ${r.returnPct >= 0 ? '+' : ''}${r.returnPct.toFixed(1)}% on what it put to work · win rate ${Math.round((r.wins / r.closed) * 100)}% · max drawdown ${usd(r.maxDrawdown)}`;
+  const sharpe = r.sharpe !== undefined ? ` · Sharpe ${r.sharpe.toFixed(2)}` : '';
+  const turnover = r.turnover !== undefined ? ` · turnover ${r.turnover.toFixed(1)}×/yr` : '';
+  return `Paper: profit factor ${pf === Infinity ? '∞' : pf.toFixed(2)} · ${r.returnPct >= 0 ? '+' : ''}${r.returnPct.toFixed(1)}% on what it put to work · win rate ${Math.round((r.wins / r.closed) * 100)}%${sharpe} · max drawdown ${usd(r.maxDrawdown)}${turnover}`;
 }
 
 /** The form to register a strategy. Made once, so what you type survives every update. */
