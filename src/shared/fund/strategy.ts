@@ -322,6 +322,10 @@ export interface MoveContext {
   bar: ValidationBar;
   realMarket: boolean;
   paperDays: number;
+  /** How its trades on paper have done, and what they must show before a person may approve it. */
+  paper: PaperRecord;
+  paperTrades: number;
+  paperProfitFactor: number;
   now: number;
 }
 
@@ -343,6 +347,9 @@ export function checkMove(s: Strategy, to: StrategyStage, c: MoveContext): strin
     if (!person) return 'Only a person approves a strategy';
     const days = s.paperSince ? (c.now - s.paperSince) / DAY_MS : 0;
     if (days < c.paperDays) return `${s.id} has been on paper ${days.toFixed(1)} days: it needs ${c.paperDays} before it's approved`;
+    if (c.paper.closed < c.paperTrades) return `${s.id} has closed ${c.paper.closed} trade${c.paper.closed === 1 ? '' : 's'} on paper: it needs ${c.paperTrades} before it's approved`;
+    const pf = paperProfitFactor(c.paper);
+    if (pf !== undefined && pf < c.paperProfitFactor) return `${s.id}'s profit factor on paper is ${pf.toFixed(2)}: it needs ${c.paperProfitFactor} before it's approved`;
     return undefined;
   }
   if (!person && !c.canStrategy) return 'Only the quant lab (Quant, Strategy, Backtester) or the CIO or PM moves a strategy along';
@@ -471,23 +478,71 @@ export interface PaperRecord {
   open: number;
   closed: number;
   wins: number;
+  /** Fees included, as every figure here. */
   realizedPnl: number;
+  /** What its winners made, and its losers lost (as a positive number). */
+  grossProfit: number;
+  grossLoss: number;
+  /** Realized P&L over what its closed trades put to work at entry, %. */
+  returnPct: number;
+  /** The deepest its realized P&L fell from its high, closed trade by closed trade, in USD. */
+  maxDrawdown: number;
+  /**
+   * Its closed trades' returns, their mean over their spread, scaled to a year by how many it closes
+   * a year; against a zero risk-free rate, as a backtest's. Undefined until two have closed.
+   */
+  sharpe?: number;
+  /** How many times a year it turns over what it puts to work, entries and exits both, as a backtest's. */
+  turnover?: number;
+}
+
+const YEAR_MS = 365.25 * 86_400_000;
+/** The shortest time its trades are counted over, so a few quick ones aren't scaled up to a year. */
+const MIN_SPAN_MS = 30 * 86_400_000;
+
+/** Gross profit over gross loss on its closed paper trades: Infinity with no losers, undefined with none closed. */
+export function paperProfitFactor(r: PaperRecord): number | undefined {
+  if (!r.closed) return undefined;
+  return r.grossLoss > 0 ? r.grossProfit / r.grossLoss : Infinity;
 }
 
 /** How the trades proposed under strategy `id` have done. */
 export function paperRecord(proposals: readonly Proposal[], id: string): PaperRecord {
-  const r: PaperRecord = { proposals: 0, filled: 0, open: 0, closed: 0, wins: 0, realizedPnl: 0 };
+  const r: PaperRecord = { proposals: 0, filled: 0, open: 0, closed: 0, wins: 0, realizedPnl: 0, grossProfit: 0, grossLoss: 0, returnPct: 0, maxDrawdown: 0 };
+  const closed: { from: number; at: number; pnl: number; put: number; out: number }[] = [];
   for (const p of proposals) {
     if (p.strategyId !== id) continue;
     r.proposals++;
     if (p.entryFill) r.filled++;
     if (p.stage === 'executing' || p.stage === 'monitoring') r.open++;
     if ((p.stage === 'exited' || p.stage === 'reviewed') && p.pnl !== undefined) {
-      r.closed++;
-      r.realizedPnl += p.pnl;
-      if (p.pnl > 0) r.wins++;
+      const at = p.history.find((h) => h.stage === 'exited')?.at ?? p.updatedAt;
+      const from = p.history.find((h) => h.stage === 'executing' || h.stage === 'monitoring')?.at ?? at;
+      const qty = Math.abs(p.qty ?? 0);
+      closed.push({ from, at, pnl: p.pnl, put: qty * (p.entryPrice ?? 0), out: qty * (p.exitPrice ?? p.entryPrice ?? 0) });
     }
   }
+  let put = 0;
+  let high = 0;
+  for (const t of closed.sort((a, b) => a.at - b.at)) {
+    r.closed++;
+    r.realizedPnl += t.pnl;
+    if (t.pnl > 0) {
+      r.wins++;
+      r.grossProfit += t.pnl;
+    } else r.grossLoss -= t.pnl;
+    put += t.put;
+    high = Math.max(high, r.realizedPnl);
+    r.maxDrawdown = Math.max(r.maxDrawdown, high - r.realizedPnl);
+  }
+  r.returnPct = put > 0 ? (r.realizedPnl / put) * 100 : 0;
+  if (!closed.length || put <= 0) return r;
+  const years = Math.max(MIN_SPAN_MS, Math.max(...closed.map((t) => t.at)) - Math.min(...closed.map((t) => t.from))) / YEAR_MS;
+  const rets = closed.filter((t) => t.put > 0).map((t) => t.pnl / t.put);
+  const m = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const sd = rets.length > 1 ? Math.sqrt(rets.reduce((a, b) => a + (b - m) ** 2, 0) / (rets.length - 1)) : 0;
+  if (sd > 0) r.sharpe = Math.round((m / sd) * Math.sqrt(rets.length / years) * 100) / 100;
+  r.turnover = Math.round((closed.reduce((a, t) => a + t.put + t.out, 0) / (put / closed.length) / years) * 100) / 100;
   return r;
 }
 

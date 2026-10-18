@@ -13,7 +13,7 @@ import {
   validateCodexHook,
   writeCodexHook,
 } from '../src/server/codex.js';
-import { codex } from '../src/server/providers/codex.js';
+import { codex, codexBlocked } from '../src/server/providers/codex.js';
 
 test('normalizes bounded root Codex hook payloads and passes only the metric reader path', () => {
   assert.deepEqual(normalizeCodexHook('SessionStart', {
@@ -37,6 +37,14 @@ test('rejects unknown, malformed, empty, oversized, and child-scoped events', ()
   assert.equal(validateCodexHook('Stop', { session_id: 'x', agent_id: 'c'.repeat(161) }), false);
 });
 
+/** The hook command for `event`, read back out of its `-c` override as Codex's TOML parser would. */
+function hookCommand(args: string[], event: string): string {
+  const config = args.find((a) => a.startsWith(`hooks.${event}=`)) ?? '';
+  const quoted = /command=("(?:[^"\\]|\\.)*")/.exec(config)?.[1];
+  assert.ok(quoted, config);
+  return JSON.parse(quoted) as string;
+}
+
 test('generates one stable CLI hook override per supported event', () => {
   const args = codexHookArgs('/tmp/office data/agent-office-codex-hook.cjs');
   assert.equal(args.length, CODEX_HOOK_EVENTS.length * 2);
@@ -45,8 +53,14 @@ test('generates one stable CLI hook override per supported event', () => {
     assert.match(args[i * 2 + 1], new RegExp(`^hooks\\.${CODEX_HOOK_EVENTS[i]}=\\[\\{hooks=`));
     assert.match(args[i * 2 + 1], /type="command"/);
     assert.match(args[i * 2 + 1], /timeout=3/);
-    assert.match(args[i * 2 + 1], /agent-office-codex-hook\.cjs/);
+    assert.match(args[i * 2 + 1], /agent-office-codex-hook/);
   }
+  // Codex runs a hook with `sh -lc` elsewhere. On Windows its shell may be PowerShell, cmd.exe or Git
+  // Bash, so the command is the launcher's bare name (written by writeCodexHook) and the event.
+  const posix = hookCommand(codexHookArgs("/tmp/it's here/hook.cjs", 'linux'), 'Stop');
+  assert.equal(posix, `'${process.execPath}' '/tmp/it'"'"'s here/hook.cjs' 'Stop'`);
+  const windows = hookCommand(codexHookArgs('C:\\Office Data\\hook.cjs', 'win32'), 'Stop');
+  assert.equal(windows, 'agent-office-codex-hook Stop');
 });
 
 test('a worker\'s own model and effort go on Codex\'s command line, in place of an office-wide model', () => {
@@ -85,7 +99,65 @@ test('writes a mode-restricted helper that forwards paths without reading transc
     assert.match(source, /MAX = 64 \* 1024/);
     assert.match(source, /AGENT_OFFICE_HOOK_TOKEN/);
     assert.doesNotMatch(source, /readFile|readSync|createReadStream/);
+    // On Windows, its launchers go in the office's commands folder, which is on every worker's PATH.
+    writeCodexHook(dir, 'win32');
+    assert.equal(readFileSync(path.join(dir, 'bin', 'agent-office-codex-hook.cmd'), 'utf8'), `@"${process.execPath}" "${file}" %*\r\n`);
+    assert.match(readFileSync(path.join(dir, 'bin', 'agent-office-codex-hook'), 'utf8'), /^#!\/bin\/sh\nexec '.+' '.+agent-office-codex-hook\.cjs' "\$@"\n$/);
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the hook command runs in each shell Codex may run it in, and reaches the office', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent office codex '));
+  const received: string[] = [];
+  const server = createServer((req, res) => {
+    received.push(req.url ?? '');
+    req.resume();
+    req.on('end', () => res.writeHead(200).end());
+  });
+  try {
+    const file = writeCodexHook(dir);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    assert.ok(address && typeof address === 'object');
+    const line = hookCommand(codexHookArgs(file), 'Stop');
+    // Codex runs a hook in its session's shell. On Windows that's PowerShell (`-NoProfile -Command
+    // <command>`) or cmd.exe (`/c "<command>"`, passed verbatim); elsewhere `sh -lc <command>`. Like
+    // every worker, it has the office's commands folder first on its PATH.
+    const shells: [string, string[], boolean][] =
+      process.platform === 'win32'
+        ? [
+            [process.env.ComSpec ?? 'cmd.exe', ['/c', `"${line}"`], true],
+            ['powershell.exe', ['-NoProfile', '-Command', line], false],
+          ]
+        : [['/bin/sh', ['-lc', line], false]];
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      AGENT_OFFICE_HOOK_URL: `http://127.0.0.1:${address.port}`,
+      AGENT_OFFICE_HOOK_TOKEN: 'hook-token',
+      AGENT_OFFICE_WORKER_ID: 'worker-1',
+    };
+    const pathKey = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH';
+    env[pathKey] = [path.join(dir, 'bin'), env[pathKey]].filter(Boolean).join(path.delimiter);
+    for (const [shell, args, verbatim] of shells) {
+      received.length = 0;
+      const child = spawn(shell, args, { env, windowsVerbatimArguments: verbatim });
+      const { code, stdout, stderr } = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (chunk) => { stdout += chunk; });
+        child.stderr.on('data', (chunk) => { stderr += chunk; });
+        child.on('error', reject);
+        child.on('close', (code) => resolve({ code, stdout, stderr }));
+        child.stdin.end(JSON.stringify({ session_id: 'thread-1', turn_id: 'turn-1' }));
+      });
+      assert.equal(code, 0, `${shell}: ${stderr}`);
+      assert.equal(stdout.trim(), '{}', shell);
+      assert.deepEqual(received, ['/hooks/codex?worker=worker-1&event=Stop'], shell);
+    }
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -139,4 +211,17 @@ test('helper forwards only the bounded root event fields to the authenticated br
     await new Promise<void>((resolve) => server.close(() => resolve()));
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("a Codex that hasn't said it's up needs a human only while a setup screen shows", () => {
+  // As a Codex worker's screen showed them, on its first start and after being resumed.
+  const hooks = '  Hooks need review\n  7 hooks are new or changed.\n  Hooks can run outside the sandbox after you trust them.\n\n› 1. Review hooks\n  2. Trust all and continue\n  3. Continue without trusting (hooks won\'t run)';
+  const prompt = '  Worked for 6m 27s • 11:01 AM\n\n› Ask Codex to do anything\n\n  GPT-6-Astra xhigh · ~/office  ⚠ 2 warnings · f2 to view';
+  assert.match(codexBlocked(hooks, true) ?? '', /review Office hooks/);
+  assert.match(codexBlocked('  Sign in with ChatGPT\n  Sign in with Device Code\n  Provide your own API key', true) ?? '', /complete login/);
+  // Resumed with no prompt, it runs no hook until its first turn: at its prompt, it's ready.
+  assert.equal(codexBlocked(prompt, true), undefined);
+  // Once it has said it's up, its screen isn't read for this.
+  assert.equal(codexBlocked(hooks, false), undefined);
+  assert.equal(codex.screen?.blocked, codexBlocked);
 });

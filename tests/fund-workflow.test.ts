@@ -55,9 +55,15 @@ test('one trade through every stage: idea, research, proposal, risk review, CIO 
   assert.match(last('t'), /Flows check out/);
   await status('r', 'finished', 'P-1 research done');
 
-  // 3–4. Proposal and risk review: the trader fills it in too big, and the risk engine (code, not a
-  // model) resizes it to the 10% position limit. With a CIO at a desk, it goes to the CIO next.
+  // 3–4. Proposal and risk review: the trader asks the risk engine first (and the log has that it asked),
+  // fills it in too big anyway, and the risk engine (code, not a model) resizes it to the 10% position
+  // limit. With a CIO at a desk, it goes to the CIO next.
   await status('t', 'proposing', 'P-1');
+  const asked = (await call('t', 'risk-check', { symbol: 'BTC', side: 'long', sizeUsd: 150_000, stop: 95_000 })).verdict;
+  assert.deepEqual([asked.decision, asked.approvedUsd], ['resized', 100_000]);
+  const checked = fund.activity.list({ kind: 'risk' }).at(-1)!;
+  assert.equal(checked.actor.name, 'Tex');
+  assert.match(checked.text, /^Asked the risk engine about long BTC \$150,000: it would be resized to \$100,000 \(/);
   const proposed = (await call('t', 'propose', { id: 'P-1', sizeUsd: 150_000, entry: 100_000, stop: 95_000, target: 110_000, confidence: 70, horizon: '2w', catalyst: 'Quarter-end ETF rebalancing', evidence: ['ETF inflows five days running', 'Funding near flat'], dissent: 'A macro shock would hit crypto first.' })).proposal;
   assert.equal(proposed.stage, 'cio_review');
   assert.equal(proposed.risk.decision, 'resized');
@@ -127,6 +133,12 @@ test('one trade through every stage: idea, research, proposal, risk review, CIO 
   assert.deepEqual(fund.state().positionHistory.map((e) => e.action), ['close', 'open']);
   const record = deskRecord(fund.proposals.list(), 'crypto-trader');
   assert.deepEqual([record.proposed, record.filled, record.closed, record.wins, record.losses], [1, 1, 1, 1, 0]);
+  // Its history: the trade, with the confidence it was proposed with and what its review said, and how well that confidence foretold it.
+  const [trade] = record.history;
+  assert.deepEqual([record.history.length, trade.id, trade.symbol, trade.side, trade.thesisHeld, trade.at], [1, 'P-1', 'BTC', p.side, p.review!.thesisHeld, p.history.find((h) => h.stage === 'exited')!.at]);
+  assert.equal(trade.pnl, p.pnl);
+  assert.ok(trade.returnPct! > 9 && trade.returnPct! < 11, `about 10%: ${trade.returnPct}`);
+  assert.equal(record.brier, (1 - p.confidence / 100) ** 2, 'a win: the gap between its confidence and certainty');
   const memory = fund.desks.memory('crypto-analyst');
   assert.ok(!('error' in memory));
   assert.equal(memory.theses[0].confidence, 68);

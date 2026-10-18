@@ -5,26 +5,29 @@ import type { ActivityEvent, ActivityKind } from '../../../shared/fund/types';
 import { h } from '../../ui/dom';
 import { clock, type FundTab } from './view';
 
-const KINDS: { id: 'all' | ActivityKind; label: string }[] = [
-  { id: 'all', label: 'Everything' },
-  { id: 'proposal', label: 'Proposals' },
-  { id: 'risk', label: 'Risk' },
-  { id: 'ruling', label: 'Rulings' },
-  { id: 'committee', label: 'Committees' },
-  { id: 'strategy', label: 'Strategies' },
-  { id: 'backtest', label: 'Backtests' },
-  { id: 'fill', label: 'Fills' },
-  { id: 'exit', label: 'Exits' },
-  { id: 'limits', label: 'Limits' },
-  { id: 'review', label: 'Reviews' },
-  { id: 'thesis', label: 'Theses' },
-  { id: 'observation', label: 'Observations' },
-  { id: 'status', label: 'Status' },
-  { id: 'assignment', label: 'Assignments' },
-  { id: 'message', label: 'Messages' },
-  { id: 'escalation', label: 'Escalations' },
-  { id: 'system', label: 'The office' },
-];
+/** A chip for every kind the log holds: a kind added to ActivityKind needs one here. */
+const LABEL: Record<ActivityKind, string> = {
+  proposal: 'Proposals',
+  risk: 'Risk',
+  ruling: 'Rulings',
+  committee: 'Committees',
+  strategy: 'Strategies',
+  backtest: 'Backtests',
+  fill: 'Fills',
+  exit: 'Exits',
+  limits: 'Limits',
+  review: 'Reviews',
+  thesis: 'Theses',
+  observation: 'Observations',
+  status: 'Status',
+  assignment: 'Assignments',
+  message: 'Messages',
+  request: 'Requests',
+  routine: 'Routines',
+  escalation: 'Escalations',
+  system: 'The office',
+};
+const KINDS: { id: 'all' | ActivityKind; label: string }[] = [{ id: 'all', label: 'Everything' }, ...(Object.entries(LABEL) as [ActivityKind, string][]).map(([id, label]) => ({ id, label }))];
 
 export function activityTab(): FundTab {
   let kind: 'all' | ActivityKind = 'all';

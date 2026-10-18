@@ -4,7 +4,7 @@
 import type { AgentProvider } from '../providers.js';
 import type { WorkerStatus } from '../protocol/workers.js';
 import { DEPARTMENTS, DESK_STATUSES, ROLE_BY_ID, ROLES, type DeskProfile, type DeskStatus, type Permission, type RoleDef } from './roles.js';
-import type { Actor, Proposal } from './types.js';
+import type { Actor, Proposal, Side } from './types.js';
 import type { ResearchRequest, Routine } from './work.js';
 
 /** A desk as the window shows it: its profile, the worker at it, and how its role's calls have done. */
@@ -99,15 +99,39 @@ export interface DeskRecord {
   realizedPnl: number;
   /** The average closed trade's return on what it put on, in %. */
   avgReturnPct?: number;
+  /** The mean squared gap between the confidence it gave (as a chance) and whether it won: 0 is perfect, 0.25 is always saying 50%. */
+  brier?: number;
+  /** Its latest closed trades, oldest first: the last DESK_HISTORY of them. */
+  history: DeskTrade[];
 }
+
+/** A closed trade in a role's record. */
+export interface DeskTrade {
+  id: string;
+  symbol: string;
+  side: Side;
+  /** The confidence it proposed it with, 0–100. */
+  confidence: number;
+  /** Realized, fees included. */
+  pnl: number;
+  /** On what it put on, in %. */
+  returnPct?: number;
+  /** When it closed. */
+  at: number;
+  /** What its review said: whether the thesis played out, whatever the P&L did. */
+  thesisHeld?: boolean;
+}
+
+/** How many of a role's closed trades its record lists. */
+export const DESK_HISTORY = 30;
 
 const OPEN_STAGES: readonly string[] = ['executing', 'monitoring'];
 const CLOSED_STAGES: readonly string[] = ['exited', 'reviewed'];
 
 /** How the proposals made by whoever held `role` have done. */
 export function deskRecord(proposals: readonly Proposal[], role: string): DeskRecord {
-  const r: DeskRecord = { proposed: 0, filled: 0, rejected: 0, open: 0, closed: 0, wins: 0, losses: 0, realizedPnl: 0 };
-  const returns: number[] = [];
+  const r: DeskRecord = { proposed: 0, filled: 0, rejected: 0, open: 0, closed: 0, wins: 0, losses: 0, realizedPnl: 0, history: [] };
+  const trades: DeskTrade[] = [];
   for (const p of proposals) {
     if (p.author.role !== role || p.stage === 'idea' || p.stage === 'research') continue;
     r.proposed++;
@@ -119,11 +143,25 @@ export function deskRecord(proposals: readonly Proposal[], role: string): DeskRe
       r.realizedPnl += p.pnl;
       if (p.pnl > 0) r.wins++;
       else r.losses++;
-      const put = (p.qty ?? 0) * (p.entryPrice ?? 0);
-      if (put > 0) returns.push((p.pnl / put) * 100);
+      // A filled qty is signed: a short's is negative.
+      const put = Math.abs(p.qty ?? 0) * (p.entryPrice ?? 0);
+      trades.push({
+        id: p.id,
+        symbol: p.symbol,
+        side: p.side,
+        confidence: p.confidence,
+        pnl: p.pnl,
+        ...(put > 0 ? { returnPct: (p.pnl / put) * 100 } : {}),
+        at: p.history.find((h) => h.stage === 'exited')?.at ?? p.updatedAt,
+        ...(p.review ? { thesisHeld: p.review.thesisHeld } : {}),
+      });
     }
   }
-  if (returns.length) r.avgReturnPct = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const returns = trades.flatMap((t) => (t.returnPct === undefined ? [] : [t.returnPct]));
+  if (returns.length) r.avgReturnPct = mean(returns);
+  if (trades.length) r.brier = mean(trades.map((t) => (t.confidence / 100 - (t.pnl > 0 ? 1 : 0)) ** 2));
+  r.history = trades.sort((a, b) => a.at - b.at).slice(-DESK_HISTORY);
   return r;
 }
 

@@ -11,6 +11,8 @@ export const BASE: Record<string, number> = {
   SPY: 600, QQQ: 520, IWM: 220, AAPL: 230, MSFT: 450, NVDA: 150, AMZN: 200, TSLA: 300, JPM: 240,
   XOM: 115, COIN: 280, MSTR: 350, TLT: 90, GLD: 280, USO: 75, IBIT: 55,
 };
+/** How big a day's simulated US spot ETF flows run, US$m, for the assets that have such funds. */
+const ETF_FLOW: Record<string, number> = { BTC: 250, ETH: 80, SOL: 10 };
 /** Yearly volatility by class. */
 export const VOL: Record<AssetClass, number> = { crypto: 0.6, equity: 0.35, etf: 0.18, index: 0.18, rates: 0.12, commodity: 0.25, fx: 0.08 };
 /** Value traded per day, USD. */
@@ -105,8 +107,10 @@ export class MockMarket {
       const m = round(5 + this.rand() * 80, 1);
       mk({ id: 'liquidations:mock', kind: 'liquidations', symbol: liq.symbol, label: 'Liquidations, last hour', value: m * 1e6, unit: 'USD', text: `${longs ? 'Longs' : 'Shorts'} liquidated: $${m}M across ${liq.symbol} perps (simulated)` });
     }
-    const flow = round(this.gauss() * 250, 0);
-    mk({ id: 'etf_flows:mock', kind: 'etf_flows', symbol: 'BTC', label: 'Spot BTC ETF net flow', value: flow * 1e6, unit: 'USD', text: `Spot bitcoin ETFs saw ${flow >= 0 ? 'inflows' : 'outflows'} of $${Math.abs(flow)}M yesterday (simulated)` });
+    for (const l of crypto.filter((c) => ETF_FLOW[c.symbol])) {
+      const flow = round(this.gauss() * ETF_FLOW[l.symbol], 1);
+      mk({ id: `etf_flows:${l.symbol}:mock`, kind: 'etf_flows', symbol: l.symbol, label: `Spot ${l.symbol} ETF net flow`, value: flow * 1e6, unit: 'USD', text: `Spot ${l.symbol} ETFs saw ${flow >= 0 ? 'inflows' : 'outflows'} of $${Math.abs(flow)}M yesterday (simulated)` });
+    }
     const macro = this.pick(MACRO);
     const surprise = round(this.gauss() * 0.15, 2);
     mk({ id: 'macro:mock', kind: 'macro', label: macro.name, value: round(macro.base + surprise, 2), unit: macro.unit, text: `${macro.name} came in at ${round(macro.base + surprise, 2)}${macro.unit} vs ${macro.base}${macro.unit} expected (simulated)` });

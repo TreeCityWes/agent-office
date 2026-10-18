@@ -107,6 +107,11 @@ export interface ProviderAdapter<S = undefined, P = undefined> {
      * in), or undefined when it can. `early`: it hasn't started, or was already found blocked.
      */
     blocked?(text: string, early: boolean): string | undefined;
+    /**
+     * It gets a paste as keystrokes and counts an Enter right after them as part of it, so a prompt
+     * the office types in is submitted only once it shows on its screen (see workers/typing.ts).
+     */
+    enterOnShown?: boolean;
   };
   usage?: ProviderUsage<S>;
   /** The office names its workers' tasks (see TaskNamer); the others keep the task their first prompt gives. */

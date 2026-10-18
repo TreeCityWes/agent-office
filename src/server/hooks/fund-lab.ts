@@ -30,7 +30,9 @@ export const LAB_READS: Record<string, (a: Ask) => Answer> = {
       kinds: STRATEGY_KINDS.map((k) => ({ id: k.id, label: k.label, blurb: k.blurb, params: k.params })),
       validationBar: c.validationBar,
       paperDays: c.strategyPaperDays,
-      lifecycle: 'idea → research → backtest → validation → paper → approved, or retired. Each step has a gate in code: research needs rules, backtest a backtest of them, validation enough history, paper a backtest that clears the validation bar (moved there by a desk that didn’t write it), approved a person, after the paper days.',
+      paperTrades: c.strategyPaperTrades,
+      paperProfitFactor: c.strategyPaperProfitFactor,
+      lifecycle: 'idea → research → backtest → validation → paper → approved, or retired. Each step has a gate in code: research needs rules, backtest a backtest of them, validation enough history, paper a backtest that clears the validation bar (moved there by a desk that didn’t write it), approved a person, after the paper days, once enough of its paper trades have closed at a profit factor that clears paperProfitFactor.',
     };
   },
   backtests({ ctx, q }) {

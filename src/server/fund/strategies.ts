@@ -255,7 +255,8 @@ export class Strategies {
     const latest = this.latest(s);
     const role = this.roleOf(by);
     if (by.kind === 'agent' && !role) return { error: 'You hold no desk at the fund' };
-    const why = checkMove(s, to, { by, role, canStrategy: this.may(by, 'strategy'), canRule: by.kind === 'agent' && this.may(by, 'rule'), latest, bar: c.validationBar, realMarket: c.market === 'public', paperDays: c.strategyPaperDays, now: this.fund.now() });
+    const paper = paperRecord(this.fund.proposals.list(), s.id);
+    const why = checkMove(s, to, { by, role, canStrategy: this.may(by, 'strategy'), canRule: by.kind === 'agent' && this.may(by, 'rule'), latest, bar: c.validationBar, realMarket: c.market === 'public', paperDays: c.strategyPaperDays, paper, paperTrades: c.strategyPaperTrades, paperProfitFactor: c.strategyPaperProfitFactor, now: this.fund.now() });
     if (why) return { error: why };
     const note = typeof r.note === 'string' ? r.note.trim().slice(0, 500) : undefined;
     let next = this.step(s, to, by, note);

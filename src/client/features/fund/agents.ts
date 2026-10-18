@@ -1,7 +1,8 @@
 // The 💼 Fund window's desks: every role at the fund by department, the agent holding each (what it
 // says it's doing, its thesis and confidence, how its calls have done), and the messages between them.
 // An admin staffs a role with a new agent or one already at a desk, hands it a task, messages it, or
-// takes the role back; anyone can read a role's memory. The desks' routines are listed under them (routines.ts).
+// takes the role back; anyone can read a role's memory, and its record: what it may do and how its trades
+// have done (desk-record.ts). The desks' routines are listed under them (routines.ts).
 import './agents.css';
 import { winRate, type DeskMemory, type DeskRecord, type DeskView, type FundMessage } from '../../../shared/fund/desks';
 import { DEPARTMENTS, DESK_STATUS_LABEL, ROLE_BY_ID, ROLES, type Department, type RoleDef } from '../../../shared/fund/roles';
@@ -11,6 +12,7 @@ import type { AgentProvider } from '../../../shared/providers';
 import { store } from '../../state';
 import { h, STATUS_LABEL, timeAgo } from '../../ui/dom';
 import { PROVIDER_LABEL, supportedProviders } from '../../ui/provider';
+import { recordView } from './desk-record';
 import { routinesSection } from './routines';
 import { clock, confirmButton, money, section, type FundTab, type TabDeps } from './view';
 
@@ -18,7 +20,7 @@ import { clock, confirmButton, money, section, type FundTab, type TabDeps } from
 const CORE = ['cio', 'macro', 'crypto-analyst', 'quant', 'skeptic'];
 const KIND_ICON: Record<FundMessage['kind'], string> = { message: '📨', assignment: '📋', escalation: '🚨', committee: '🏛️', request: '🔎', routine: '⏰' };
 
-type Panel = 'assign' | 'message' | 'memory';
+type Panel = 'assign' | 'message' | 'memory' | 'record';
 
 const named = (a: Actor) => (a.role && ROLE_BY_ID.get(a.role) ? `${a.name} (${ROLE_BY_ID.get(a.role)!.title})` : a.name);
 
@@ -35,12 +37,12 @@ function staffPicker(taken: ReadonlySet<string>): HTMLSelectElement {
   ) as HTMLSelectElement;
 }
 
-function recordLine(r: DeskRecord): HTMLElement | null {
-  if (!r.proposed) return null;
+function recordLine(r: DeskRecord | undefined): HTMLElement | null {
+  if (!r?.proposed) return null;
   const wr = winRate(r);
   return h(
     'span.fd-record',
-    { title: 'Its role’s proposals: how many it made, filled, won and lost, and what the closed ones made' },
+    { title: 'Its role’s proposals: how many it made, filled, won and lost, and what the closed ones made. Record has the trades.' },
     `${r.proposed} proposed · ${r.filled} filled`,
     r.closed ? ` · ${r.wins}W ${r.losses}L${wr !== undefined ? ` (${wr.toFixed(0)}%) ` : ' '}` : ' ',
     r.closed ? money(r.realizedPnl, true) : null,
@@ -95,7 +97,8 @@ export function agentsTab(deps: TabDeps): FundTab {
     if (last) update(last);
   }
 
-  function panel(role: RoleDef, kind: Panel): HTMLElement {
+  function panel(role: RoleDef, kind: Panel, rec: DeskRecord | undefined): HTMLElement {
+    if (kind === 'record') return recordView(role, rec);
     if (kind === 'memory') {
       const m = store.fundMemory;
       return m?.role === role.id ? memoryView(m) : h('div.fd-empty', {}, 'Reading its memory…');
@@ -115,12 +118,12 @@ export function agentsTab(deps: TabDeps): FundTab {
     return h('div.fd-compose', {}, text, h('div.fd-actions', {}, h('span.fd-hint', {}, 'It’s typed into the agent’s session, and kept in its inbox and the fund’s log.'), h('button.fd-btn', { type: 'button', onclick: () => toggle(role.id, kind) }, 'Cancel'), h('button.fd-btn.go', { type: 'button', onclick: go }, kind === 'assign' ? 'Assign' : 'Send')));
   }
 
-  function row(role: RoleDef, d: DeskView | undefined, rec: DeskRecord, taken: ReadonlySet<string>): HTMLElement {
+  function row(role: RoleDef, d: DeskView | undefined, rec: DeskRecord | undefined, taken: ReadonlySet<string>): HTMLElement {
     const admin = deps.admin();
     const btn = (label: string, kind: Panel) => h('button', { type: 'button', class: `fd-btn small${open.get(role.id) === kind ? ' on' : ''}`, onclick: () => toggle(role.id, kind) }, label);
     const actions: (HTMLElement | null)[] = [];
     if (d && admin) actions.push(btn('Assign', 'assign'), btn('Message', 'message'));
-    actions.push(btn('Memory', 'memory'));
+    actions.push(btn('Memory', 'memory'), btn('Record', 'record'));
     if (d && admin) actions.push(confirmButton('Release', 'Free the desk?', () => deps.send({ t: 'fund.release', workerId: d.workerId }), 'danger small'));
     if (!d && admin) {
       const pick = staffPicker(taken);
@@ -158,7 +161,7 @@ export function agentsTab(deps: TabDeps): FundTab {
       !d ? h('div.fd-desk-note.muted', {}, role.blurb) : null,
       d?.assignment ? h('div.fd-desk-assign', {}, '📋 ', h('b', {}, d.assignment.by), ` ${timeAgo(d.assignment.at)}: `, d.assignment.text) : null,
       d?.thesis ? h('div.fd-desk-thesis', {}, confidence(d.confidence), h('span', {}, d.thesis.length > 320 ? `${d.thesis.slice(0, 320)}…` : d.thesis)) : null,
-      kind ? panel(role, kind) : null,
+      kind ? panel(role, kind, rec) : null,
     );
   }
 

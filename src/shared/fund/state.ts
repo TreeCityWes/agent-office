@@ -30,6 +30,10 @@ export interface FundConfig {
   validationBar: ValidationBar;
   /** How long a strategy trades on paper before a person may approve it. */
   strategyPaperDays: number;
+  /** How many of its paper trades must have closed before a person may approve it. */
+  strategyPaperTrades: number;
+  /** The profit factor those must show (gross profit over gross loss). */
+  strategyPaperProfitFactor: number;
 }
 
 export const DEFAULT_CONFIG: FundConfig = {
@@ -44,6 +48,8 @@ export const DEFAULT_CONFIG: FundConfig = {
   proposalTtlHours: 24,
   validationBar: DEFAULT_BAR,
   strategyPaperDays: 14,
+  strategyPaperTrades: 3,
+  strategyPaperProfitFactor: 1,
 };
 
 /** The capital a new fund starts with, paid in by the office when the ledger is first made. */
@@ -94,6 +100,16 @@ export function checkConfig(raw: unknown, base: FundConfig = DEFAULT_CONFIG): { 
     const v = num(r.strategyPaperDays, 0, 365);
     if (v === undefined) return { error: 'strategyPaperDays is from 0 to 365' };
     out.strategyPaperDays = v;
+  }
+  if (r.strategyPaperTrades !== undefined) {
+    const v = num(r.strategyPaperTrades, 0, 1000);
+    if (v === undefined || !Number.isInteger(v)) return { error: 'strategyPaperTrades is a whole number from 0 to 1000' };
+    out.strategyPaperTrades = v;
+  }
+  if (r.strategyPaperProfitFactor !== undefined) {
+    const v = num(r.strategyPaperProfitFactor, 0, 20);
+    if (v === undefined) return { error: 'strategyPaperProfitFactor is from 0 to 20' };
+    out.strategyPaperProfitFactor = v;
   }
   if (r.assets !== undefined) {
     if (!Array.isArray(r.assets) || r.assets.length > 200) return { error: 'assets is a list of up to 200' };

@@ -376,7 +376,7 @@ export const FUND_TOOLS = [
     title: 'Move a strategy',
     description:
       'Moves a strategy one step on, back to research, or to retired, when its gate allows. Backtest needs a backtest of its rules; validation, one over enough years; paper, a backtest of the current rules that clears the validation bar, moved by a desk that didn’t write it; ' +
-      'approved, a person, after its days on paper. Its owner, the CIO or PM retires it.',
+      'approved, a person, after its days on paper and once enough of its paper trades have closed at a good enough profit factor. Its owner, the CIO or PM retires it.',
     inputSchema: schema({ id: str('The strategy, like S-2.'), stage: { type: 'string', enum: ['research', 'backtest', 'validation', 'paper', 'retired'] }, note: str('Why.') }, ['id', 'stage']),
     annotations: act,
   },

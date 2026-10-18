@@ -27,6 +27,9 @@ test('the mock market: the same seed gives the same prices, it walks, and all it
     if (s.text) assert.match(s.text, /simulated/);
   }
   assert.deepEqual(new Set(signals.map((s) => s.kind)), new Set(['funding', 'open_interest', 'liquidations', 'etf_flows', 'macro', 'news', 'onchain', 'filings', 'sentiment']));
+  // ETF flows for each asset that has US spot ETFs, not bitcoin's alone.
+  const crypto = ['BTC', 'ETH', 'SOL', 'DOGE'].map((symbol): Listing => ({ symbol, feed: symbol, class: 'crypto' }));
+  assert.deepEqual(a.signals(crypto).filter((s) => s.kind === 'etf_flows').map((s) => [s.id, s.symbol]), [['etf_flows:BTC:mock', 'BTC'], ['etf_flows:ETH:mock', 'ETH'], ['etf_flows:SOL:mock', 'SOL']]);
 });
 
 test('market data asks its sources only while something wants prices, and a new mode drops the old prices', async () => {

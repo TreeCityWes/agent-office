@@ -26,6 +26,7 @@ import { WIN, binScript, defaultShell, resolveCommand, shellRun, shq, writeOffic
 import { CARRY_ON_PROMPT, WorkerTasks } from './tasks.js';
 import { flushScreens, fullScreens, newTerm, offlineBanner, screenText, type HeadlessTerminal } from './terminal.js';
 import type { HookEnv, OpenedPr, RepoSource, RunAs, Worker, WorkerContext, WorkerEvents, WorkerHandle } from './types.js';
+import { typePrompt } from './typing.js';
 import { clamp, safeEq, truncate } from './util.js';
 import { COLORS, NAMES, newWorker } from './worker.js';
 import { WorkerTrees, lostMessage } from './worktree.js';
@@ -513,9 +514,7 @@ export class WorkerManager {
     if (!w.pty) return 'Worker is not running';
     const clean = text.replace(/\r\n?/g, '\n').trim();
     if (!clean) return 'Empty prompt';
-    // Bracketed paste keeps multi-line prompts in one message, then Enter submits.
-    w.pty.write(`\x1b[200~${clean}\x1b[201~`);
-    setTimeout(() => w.pty?.write('\r'), 120);
+    typePrompt(w, clean, providerAdapter(w.info.provider)?.screen?.enterOnShown);
     w.info.activity = truncate(clean, 80);
     this.tasks.notePrompt(w, clean);
     if (by) w.info.lastInput = { by, at: Date.now() };
