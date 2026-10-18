@@ -1,5 +1,6 @@
 import type http from 'node:http';
 import { deskName, fundToolsFor } from '../../shared/fund/desks.js';
+import { positionHistory } from '../../shared/fund/positions.js';
 import { ROLE_BY_ID, ROLES } from '../../shared/fund/roles.js';
 import type { ActivityKind, Actor, Proposal } from '../../shared/fund/types.js';
 import type { WorkerInfo } from '../../shared/protocol.js';
@@ -45,11 +46,12 @@ const READS: Record<string, (a: Ask) => Answer> = {
     const role = p && ROLE_BY_ID.get(p.role);
     return { you: { id: me.id, name: me.name }, paper: true, role: role ? { id: role.id, title: role.title, department: role.department, can: role.can } : null, desk: p ?? null, tools: fundToolsFor(role) };
   },
-  portfolio({ ctx }) {
+  portfolio({ ctx, q }) {
     const f = ctx.fund;
     f.market.touch();
     const halted = f.halted();
-    return { paper: true, venue: f.venue.label, ...(halted ? { halted } : {}), portfolio: f.portfolio(), limits: f.limits };
+    const history = positionHistory(f.ledger.history, { symbol: list(q.get('symbol'))[0], limit: 50 });
+    return { paper: true, venue: f.venue.label, ...(halted ? { halted } : {}), portfolio: f.portfolio(), history, limits: f.limits };
   },
   quotes({ ctx, q }) {
     const m = ctx.fund.market;

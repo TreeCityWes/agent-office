@@ -4,6 +4,7 @@ import { assetTable, cleanSymbol } from '../../shared/fund/assets.js';
 import { rollMarks, valuePortfolio } from '../../shared/fund/book.js';
 import { price, usd } from '../../shared/fund/format.js';
 import { pnlReport } from '../../shared/fund/pnl.js';
+import { positionHistory } from '../../shared/fund/positions.js';
 import { checkProposalInput, moveProposal, STAGE_LABEL } from '../../shared/fund/proposals.js';
 import { checkLimits, evaluateRisk } from '../../shared/fund/risk.js';
 import { ROLE_BY_ID, type Permission } from '../../shared/fund/roles.js';
@@ -164,6 +165,7 @@ export class Fund {
       config: this.ledger.config,
       limits: this.ledger.limits,
       portfolio,
+      positionHistory: positionHistory(this.ledger.history, { limit: 100 }),
       pnl: pnlReport(all, portfolio.positions, this.nav.points, portfolio),
       proposals: [...live, ...done],
       market: this.market.state(),
@@ -297,6 +299,19 @@ export class Fund {
       this.log('proposal', by, `Proposed ${p.id}: ${p.side} ${p.symbol} ${usd(p.sizeUsd, { compact: true })}`, { proposalId: p.id, symbol: p.symbol });
       p = this.riskReview(p);
       this.proposals.put(p);
+      return { ok: true, proposal: p };
+    });
+  }
+
+  /** An idea sent to a desk to look into (see Desks.message): under research until it's proposed. */
+  research(id: unknown, by: Actor, note: string): Promise<Result<{ proposal: Proposal }>> {
+    return this.act(() => {
+      const found = this.find(id);
+      if ('error' in found) return found;
+      if (found.stage !== 'idea') return { error: `${found.id} is ${STAGE_LABEL[found.stage]}, not an idea` };
+      const p = this.move(found, 'research', by, note);
+      this.proposals.put(p);
+      this.log('proposal', by, `${p.id} (${p.side} ${p.symbol}) is under research: ${note}`, { proposalId: p.id, symbol: p.symbol });
       return { ok: true, proposal: p };
     });
   }

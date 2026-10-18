@@ -30,18 +30,20 @@ What doesn't carry over: GitHub as the source of work (issues and PR boards), wo
 Six layers, each depending only on the ones under it:
 
 ```
- 3D office & windows        src/client/features/fund/, world/, the trading-floor map
+ 3D office & windows        src/client/: features/fund/, world/, the trading-floor map
         │  WebSocket: fund.* messages (shared/protocol/fund.ts)
- Agent runtime              server/workers/, providers/, hooks/ — unchanged
+ Agent runtime              server/workers/, providers/ — any agent CLI, unchanged
         │  MCP tools → /fund/* on the loopback hook server, per-worker token
- Fund services              server/fund/fund.ts: proposals, desks, memory, committee, the quant lab
+ Fund services              server/fund/ fund, desks, committee, strategies, research, office · hooks/fund*.ts · ws/handlers/fund*.ts
         │
- Portfolio & risk           shared/fund/book.ts, risk.ts (pure) · server/fund/venue.ts, exits.ts
+ Portfolio & risk           shared/fund/ (book, positions, risk, proposals… pure) · server/fund/venue.ts, exits.ts
         │
- Market data                server/fund/market/: one service, adapters per source
+ Market data                server/fund/market/: one service, adapters per source · server/fund/history.ts
         │
  Persistence                server/fund/records.ts over journal.ts: hash-chained JSONL
 ```
+
+`tests/fund-layers.test.ts` reads every import and holds the lines: each fund file is in exactly one layer (a new file has to be given one); `shared/fund/` imports nothing but shared code and no Node or package, and the book, positions, risk, proposals and committee arithmetic has no clock, randomness, network or model in it; the paper venue knows only the shared domain, and exits only the venue, the records and the prices; market data imports nothing above it; the journal is generic and the records only replay it through the shared arithmetic; the fund reaches the office only through the type in `office.ts`; only `fund.ts` and `exits.ts` append to the ledger; the agent runtime imports no fund code, and the browser nothing from the server.
 
 - **Pure domain code lives in `src/shared/fund/`**: the types, the asset universe, valuing a portfolio, applying a fill, the risk engine and the proposal stages. No I/O, no clock (the time is passed in), so it's deterministic and tested directly, and the browser can show the same numbers the server enforces.
 - **`src/server/fund/`** holds what keeps state: the records (`records.ts`: the ledger, proposals, NAV history and activity log), the paper venue, exits, market data, and `Fund` (`fund.ts`), the one service the rest of the office talks to (`ctx.fund`). It's building-wide: one fund, whichever floor you're on. Everything that changes the fund runs through `Fund` one action at a time, so two approvals can't both be sized against the same book.
@@ -83,6 +85,8 @@ Agents add to them through tools (`fund_thesis`, `fund_observe`), not by editing
 
 The paper book is the ledger replayed: capital paid in (a new fund starts with $1,000,000 from the office) and every fill since. Everything else (cash, positions, average cost, realized P&L, fees) follows from those (`shared/fund/book.ts`). Valuing it against the latest quotes gives the `PortfolioView`: NAV, cash, gross and net exposure, leverage, unrealized and daily P&L, drawdown from the high-water mark, and exposure by asset class, sector and correlation group. A person can pay capital in or take it out; that moves the NAV but isn't profit, so the day's start and the high-water mark move with it. The NAV is written down every 15 minutes, at every fill and at each new UTC day, which is where the day's P&L and the drawdown are measured from.
 
+Each fill also says what it did to its position (`shared/fund/positions.ts`): **opened**, **added**, **reduced**, **closed** or **flipped** it through flat, the quantity and the average cost after, the P&L it realized and the P&L realized over that position's life, why (entry, exit, stop, target, closed by hand), the proposal and who. That's the **position history**, on the Portfolio tab and from `fund_portfolio` (one asset's with `symbol`), worked out from the same fills as the book, so the two always agree.
+
 ### Trade proposals
 
 ```
@@ -90,7 +94,9 @@ idea → research → proposed → risk_review → cio_review → user_approval 
                                   └──────────────┴──────────────┴──→ rejected   (and withdrawn, expired, failed)
 ```
 
-A proposal (`P-1`, `P-2`…) carries the asset, direction, size, entry, stop (its invalidation), target, horizon, thesis, catalyst, confidence, evidence and the strongest dissenting view. An idea needs only the asset, direction and thesis, and is filled in later. On submit a proposal goes straight through risk review (code, below). What passes waits on the CIO or PM to endorse it, when the fund requires it (the default) and one is at a desk; nobody rules on their own proposal. A proposal over 8% of NAV (a setting) needs [an investment committee's](#the-investment-committee) decision before an agent CIO or PM can rule on it. Then it waits on a person to approve it. A person may approve from CIO review without waiting, and that's on the record. Approving runs risk **again** against the book and the price as they are then, and fills on paper at what risk allows then, never more than was asked. While it's open the office watches its stop and target on every fresh price and exits it when either is hit. Once it's out, its author writes the post-trade review. A proposal nobody decides on expires after 24 hours (a setting).
+A proposal (`P-1`, `P-2`…) carries the asset, direction, size, entry, stop (its invalidation), target, horizon, thesis, catalyst, confidence, evidence and the strongest dissenting view. An idea needs only the asset, direction and thesis, and is filled in later. It moves to **research** when it's handed to a desk to work up: assigned to any desk (`fund_assign`), or sent to a research or quant desk (`fund_message`), with its `proposalId`; telling the CIO or a trader about it is just a message. On submit a proposal goes straight through risk review (code, below). What passes waits on the CIO or PM to endorse it, when the fund requires it (the default) and one is at a desk; nobody rules on their own proposal. A proposal over 8% of NAV (a setting) needs [an investment committee's](#the-investment-committee) decision before an agent CIO or PM can rule on it. Then it waits on a person to approve it. A person may approve from CIO review without waiting, and that's on the record. Approving runs risk **again** against the book and the price as they are then, and fills on paper at what risk allows then, never more than was asked. While it's open the office watches its stop and target on every fresh price and exits it when either is hit. Once it's out, its author writes the post-trade review. A proposal nobody decides on expires after 24 hours (a setting).
+
+`tests/fund-workflow.test.ts` takes one trade through every stage in one run, every agent step through the `office-fund` tools as the agent itself: a trader files the idea and asks the Crypto Analyst, who works through `analyzing`, `backtesting` and a thesis; the trader proposes it with its entry, stop, target, catalyst, evidence and dissent; risk cuts it to 10% of NAV; the CIO is refused until a committee (the Skeptic seated, BUY, BUY, HOLD, SELL) decides, then backs it; an agent's approval is refused and a person's goes through; it fills on paper, is watched, exits at its target and is reviewed. It checks who moved each stage, every desk status used, the position history, the desks' records and memory, the activity log and the hash chain.
 
 ### Risk
 
@@ -113,15 +119,23 @@ Exits (`server/fund/exits.ts`) only ever reduce: an exit closes no more than its
 
 One service, `server/fund/market/`, that every agent and window reads, instead of each agent fetching what it likes. Adapters say which asset classes or data kinds they serve:
 
-| Kind | Adapter now | Needs a key |
-| --- | --- | --- |
-| Crypto prices | Coinbase Exchange public API | no |
-| Equity and ETF prices | Yahoo Finance chart API (unofficial, delayed) | no |
-| Funding rates, open interest | OKX public API | no |
-| Any price, offline | `mock`: a seeded random walk | no |
-| Macro, news, on-chain, filings, liquidations, ETF flows | declared, `mock` until a real adapter lands | — |
+| Kind | Adapter now | How often | Needs a key |
+| --- | --- | --- | --- |
+| Crypto prices | Coinbase Exchange public API | 15 s | no |
+| Equity and ETF prices | Yahoo Finance chart API (unofficial, delayed) | a minute | no |
+| Funding rates, open interest | OKX public API, each perpetual swap | 5 min | no |
+| Liquidations | OKX public API: longs and shorts liquidated on each perpetual over the last hour, in USD (a busy hour says it's at least that, when OKX's latest 100 don't reach back an hour) | 5 min | no |
+| On-chain | mempool.space: the bitcoin fee to get in the next block, the mempool's backlog, the network hashrate | 10 min | no |
+| News | Yahoo Finance's RSS headlines, the newest three for each asset | 15 min | no |
+| Macro | FRED (St. Louis Fed) CSV: US unemployment, CPI as its change on a year before, the fed funds rate, the 10-year Treasury yield | 6 h | no |
+| Filings | SEC EDGAR: each listed company's latest filings worth reading (10-K, 10-Q, 8-K with its items, proxy, S-1, 13D/G, Form 4), the newest of each kind and up to three, linked; asked as `agent-office/0.1 (self-hosted paper fund)` as the SEC asks | an hour | no |
+| Sentiment | alternative.me's crypto fear & greed index, today and the day before | an hour | no |
+| ETF flows | `mock` only: there's no free, keyless source of daily flows | — | — |
+| Any price or signal, offline | `mock`: a seeded random walk, and simulated signals of every kind | — | no |
 
-Every quote says where it came from and when; mock data is labelled **MOCK** wherever it shows. The fund runs on one or the other, set in its settings: `public` (the sources above, no made-up signals mixed in) or `mock` (a simulated market running 60× fast, with simulated signals of every kind). Switching drops every price from the other. A new source is one adapter file and a line in the adapter list.
+Which feeds an asset is asked on are its `feeds` (`shared/fund/assets.ts`): Coinbase, OKX and Yahoo news names for crypto; the Yahoo symbol, news and the SEC's CIK for listed companies. An asset added to the watchlist in Settings can name its own. Sources about the market as a whole (mempool.space, FRED, fear & greed) are asked whatever is listed. Each source keeps whatever answered when part of it fails, and the Market tab says how each one is doing.
+
+Every quote says where it came from and when; mock data is labelled **MOCK** wherever it shows. The fund runs on one or the other, set in its settings: `public` (the real sources above, no made-up signals mixed in) or `mock` (a simulated market running 60× fast, with simulated signals of every kind). Switching drops every price from the other. A new source is one adapter file and a line in the adapter list.
 
 It only asks while it's needed: for ten minutes after anyone opens the fund or an agent asks for a price, and all the time while the fund holds something or a proposal is live. An office that never uses the fund calls out to nobody. Yahoo's quotes outside US market hours are the last close, as old as it is, so risk won't open an equity position then; stops are only acted on fresh prices. Liquidity for listed assets is the average traded value over the last few full sessions.
 
@@ -151,7 +165,7 @@ The chain makes tampering evident, not impossible: the agents run as the same us
 
 | Tab | What's on it |
 | --- | --- |
-| Portfolio | NAV, the day's and total P&L, cash, gross and net exposure, leverage and drawdown against their limits, fees paid; the NAV over time; the positions, with what each is up or down; exposure by asset class. Then the P&L: each day's as a bar (best and worst days named); where it came from by asset, by desk and by strategy, realized on closed trades and open on the rest, with each bucket's closed wins; any realized P&L no trade accounts for; and the latest closed trades with their entry, exit, P&L and return |
+| Portfolio | NAV, the day's and total P&L, cash, gross and net exposure, leverage and drawdown against their limits, fees paid; the NAV over time; the positions, with what each is up or down; the position history, what each recent fill did to its position; exposure by asset class. Then the P&L: each day's as a bar (best and worst days named); where it came from by asset, by desk and by strategy, realized on closed trades and open on the rest, with each bucket's closed wins; any realized P&L no trade accounts for; and the latest closed trades with their entry, exit, P&L and return |
 | Agents | Every role by department, staffed or vacant. A staffed desk shows its agent, what its process is doing and the status it reports, its assignment, thesis and confidence, and its record; **Memory** opens its thesis history, observations and decisions. Staff a vacant desk with an agent already at work or a new hire; **Hire** on the team bar staffs whichever of the core team (the CIO, the Macro and Crypto Analysts, the Quant Researcher and the Skeptic) is missing, in one go. Assign a task, send a message or release a desk. Underneath, the messages between the desks |
 | Research | [The desks' research](#research): **Ask a desk to research** something (an assignment, typed into its agent); what each staffed desk is doing now; every desk's thesis with its confidence and how far it moved; coverage by asset, as a heat bar, with the notes, the desks writing, ideas and live proposals, the position and the signals on each (click an asset for its notes); ideas still being researched; every research note, by department or asset, with its sources; and each desk's calls scored: hit rate, average confidence, Brier score, average return and realized P&L, then the latest calls |
 | Proposals | Waiting on your approval, with the CIO, open trades, ideas and research, finished. Each shows its thesis, catalyst, evidence and dissent, every risk check with its numbers, the CIO's and the person's rulings, its fill, its exit and review, and its history. Approve or reject it with a note for the record, or exit an open trade now. **Propose a trade yourself** goes through the same risk engine as an agent's. A proposal a committee sat on says how it went |
@@ -159,7 +173,7 @@ The chain makes tampering evident, not impossible: the agents run as the same us
 | Strategies | The [quant lab's](#strategies-and-backtests) board: every strategy by stage (Idea, Research, Backtest, Validation, Paper trading, Approved, and Retired below) with its rules, universe and owner; its latest backtest (open it in Backtests) and whether that clears the validation bar; its signal and record on paper; its hypothesis, checks and history. **Register a strategy**, backtest one, move it to its next stage (the card says what its gate is waiting for), send it back to research or retire it |
 | Backtests | **Run a backtest**, of a strategy or of rules tried out there. Every run with its Sharpe, out-of-sample Sharpe, CAGR, drawdown, profit factor, trades and whether it clears the bar; the one picked in full: its equity against buying and holding (log scale, out of sample shaded), the drawdown, the numbers in and out of sample, the bar's checks, its position now, its latest trades and the prices it ran on (source, range and hash) |
 | Risk | The book against each limit, exposure by correlation group, and the limits themselves, to change |
-| Market | Every price with its source and age (**MOCK** marked, a price too old to trade on in red), the latest signals, and how each source is doing |
+| Market | Every price with its source and age (**MOCK** marked, a price too old to trade on in red), the latest signals of each kind (funding, open interest, liquidations, ETF flows, macro, news, on-chain, filings, sentiment) with their links, and how each source is doing |
 | Activity | The fund's own log, by kind: every proposal, verdict, ruling, committee step, strategy move, backtest, fill, exit, limit change and review, and every thesis, observation, status, assignment, message and escalation from the desks, with who did it |
 | Settings | The fund's name, fee and slippage, its market data (public or mock), whether a CIO or PM rules first, how long a proposal waits, how big a proposal must be (as a % of NAV) before an agent CIO needs a committee; the quant lab's validation bar and days on paper before a person may approve a strategy; paying capital in or taking it out; starting over |
 
@@ -192,16 +206,16 @@ What an agent at a desk can call, from its `agent-office` MCP server, or from th
 
 | Tool | Who | What it does |
 | --- | --- | --- |
-| `fund_portfolio`, `fund_quotes`, `fund_market` | anyone | the paper book, prices with their source and age, the market's signals |
+| `fund_portfolio`, `fund_quotes`, `fund_market` | anyone | the paper book (positions at average cost, P&L, exposure, the limits) and its position history, prices with their source and age, the market's signals |
 | `fund_proposals`, `fund_activity`, `fund_desks`, `fund_memory` | anyone | proposals by stage or one in full, the log, who holds which desk, a role's memory |
 | `fund_research` | anyone | [the research](#research): every desk's thesis now, the latest notes, coverage by asset and each desk's calls scored against its confidence, narrowed to an asset or a role |
 | `fund_risk_check` | anyone | what the risk engine would say to a trade, without proposing it |
 | `fund_status`, `fund_thesis`, `fund_observe` | a desk | report its status, change its thesis and confidence, write down what it saw |
-| `fund_message`, `fund_inbox`, `fund_escalate` | a desk | message another desk, read what came in, escalate to the CIO and the room |
+| `fund_message`, `fund_inbox`, `fund_escalate` | a desk | message another desk (an idea sent to a research or quant desk moves to research), read what came in, escalate to the CIO and the room |
 | `fund_review` | a desk | the post-trade review of its own exited trade |
 | `fund_propose`, `fund_withdraw` | roles that propose | propose a trade or an idea (or fill an idea in), under a strategy on paper with its `strategyId`; withdraw its own |
 | `fund_rule` | CIO, PM | back or reject a proposal at CIO review |
-| `fund_assign` | CIO, PM, CRO | hand a desk a task |
+| `fund_assign` | CIO, PM, CRO | hand a desk a task (an idea handed over moves to research) |
 | `fund_committees` | anyone | the committees sitting and the latest finished, or one in full (while it votes, only your own ballot) |
 | `fund_ballot` | a seated desk | cast or revise its BUY / HOLD / SELL ballot |
 | `fund_committee`, `fund_committee_close`, `fund_decide` | CIO, PM | call a committee, open its ballots early, decide it |
@@ -221,7 +235,7 @@ The fund's research is what the desks write in their memory, gathered across eve
 - **Ideas.** Proposals still at Idea or Research.
 - **Calls.** Every trade a desk proposed that has closed is a call, scored against the confidence it was proposed with. Per desk: calls, hit rate, average confidence, average return, realized P&L and the **Brier score**, the mean of (confidence as a chance − 1 if it made money, else 0)². Zero is perfect; 0.25 is what always saying 50% scores, so a desk below it says more than a coin. A person's own trades aren't scored.
 
-To ask for research, tell a desk from the tab (or have the CIO, PM or CRO use `fund_assign`). It's an assignment like any other: typed into the agent, its current task on the Agents tab, and in the log. What comes back lands here as the desk writes it.
+To ask for research, tell a desk from the tab (or have the CIO, PM or CRO use `fund_assign`). It's an assignment like any other: typed into the agent, its current task on the Agents tab, and in the log. Name an idea in it and the idea moves to Research. What comes back lands here as the desk writes it.
 
 It reads the memory files on disk, so the window asks for it when the tab opens, again a few seconds after a desk writes a thesis or a note or a trade closes, and at least once a minute while you look. Nothing in it moves money or changes a desk's memory.
 
@@ -300,7 +314,8 @@ Each step is a pull request that leaves the office working.
 5. **Strategies and backtests** ✅ — [the quant lab](#strategies-and-backtests): strategy kinds as rules in code and a deterministic backtest engine with no look-ahead, costs and an out-of-sample split (`shared/fund/strategy.ts`, `backtest.ts`); daily price history from the public sources or the mock market, hashed (`server/fund/history.ts`); the strategy registry and its gated lifecycle, the validation bar, four eyes, signals on paper that a strategy's trades must follow (`server/fund/strategies.ts`); the lab tools; and the Strategies and Backtests tabs.
 6. **Research and P&L** ✅ — [the research](#research) gathered from every desk's memory, coverage by asset and calls scored with a Brier score (`shared/fund/research.ts`, `server/fund/research.ts`); P&L by day, asset, desk and strategy, reconciled to the book after fees (`shared/fund/pnl.ts`); `fund_research`; the Research tab, and the P&L on the Portfolio tab.
 7. **The trading floor** ✅ — [the map](#the-trading-floor) (`shared/maps/floor.ts`, `client/world/floor/`): a tower floor with the city outside, desks by department with their signs, a video wall with the ticker, the heatmap, the portfolio and risk, glass rooms for the CIO, risk, the quant lab and the committee with the pipeline, strategies, theses, committees and desks on their walls, placards over the staffed desks, and a risk beacon you can see from across the floor (`shared/fund/floor.ts`, `features/fund/floor.ts`).
+8. **Data, position history and the whole workflow** ✅ — [market data](#market-data) from real public sources for liquidations, on-chain, news, macro, filings and sentiment beside the prices, funding and open interest (`server/fund/market/signals.ts`); [the position history](#portfolio) (`shared/fund/positions.ts`) on the Portfolio tab and `fund_portfolio`; an idea moving to research when a desk is asked to work it up; the [layers](#architecture) held by a test; and one trade taken through every stage in one test.
 
 **Phase 2**: research requests that track their answers, and agents that pick work up on a schedule.
 
-**Phase 3**: richer data (news, on-chain, filings, macro, ETF flows), broker adapters, more of the office acting out the fund, and live execution behind strict approvals, if ever.
+**Phase 3**: more data (ETF flows, more on-chain and macro series, keyed sources), broker adapters, more of the office acting out the fund, and live execution behind strict approvals, if ever.

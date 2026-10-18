@@ -18,7 +18,9 @@ export const PEOPLE: Actor = { kind: 'user', id: 'account:wes', name: 'Wes' };
 export const trade = { symbol: 'BTC', side: 'long', sizeUsd: 50_000, stop: 95_000, target: 120_000, thesis: 'ETF inflows and a funding reset point higher.', confidence: 70, horizon: '2w', evidence: ['ETF inflows 5 days running'] };
 export const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function fundOffice(opts: { dir?: string; now?: () => number } = {}) {
+/** `prices` is the test's to change: the fund sees them at its next market refresh. */
+export function fundOffice(opts: { dir?: string; now?: () => number; prices?: Record<string, number> } = {}) {
+  const prices = opts.prices ?? { BTC: 100_000 };
   const workers = new Map<string, DeskWorker>();
   const told: { id: string; text: string }[] = [];
   const signs = new Map<string, string>();
@@ -29,7 +31,7 @@ export function fundOffice(opts: { dir?: string; now?: () => number } = {}) {
     sign: (id, text) => (text ? signs.set(id, text) : signs.delete(id)),
     announce: (text) => void toasts.push(text),
   };
-  const source: PriceAdapter = { id: 'mock', label: 'Test prices', everyMs: 60_000, mock: true, quotes: async (ls) => ls.filter((l) => l.symbol === 'BTC').map((l) => ({ symbol: l.symbol, price: 100_000, volumeUsd: 1e10, at: Date.now(), source: 'test' })) };
+  const source: PriceAdapter = { id: 'mock', label: 'Test prices', everyMs: 60_000, mock: true, quotes: async (ls) => ls.filter((l) => prices[l.symbol]).map((l) => ({ symbol: l.symbol, price: prices[l.symbol], volumeUsd: 1e10, at: opts.now?.() ?? Date.now(), source: 'test' })) };
   const dir = opts.dir ?? path.join(mkdtempSync(path.join(os.tmpdir(), 'fund-desks-')), 'fund');
   const fund = new Fund({ dir, office, now: opts.now, marketAdapters: () => ({ prices: [source], signals: [] }) });
   const hire = (id: string, name: string) => {
@@ -40,7 +42,7 @@ export function fundOffice(opts: { dir?: string; now?: () => number } = {}) {
   const as = (id: string) => fund.desks.actor(workers.get(id)!);
   /** Each worker's last note, by id. */
   const last = (id: string) => told.filter((t) => t.id === id).at(-1)?.text ?? '';
-  return { fund, dir, workers, told, signs, toasts, hire, as, last };
+  return { fund, dir, workers, told, signs, toasts, hire, as, last, prices };
 }
 
 /**

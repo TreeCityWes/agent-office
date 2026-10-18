@@ -1,5 +1,6 @@
 // The assets the fund knows out of the box, and checking ones added in its settings. Each says what
-// it is (class, sector, correlation group) and what each price source calls it.
+// it is (class, sector, correlation group) and what each source calls it: `news` is its Yahoo
+// headlines symbol, `sec` the company's SEC EDGAR CIK.
 import { ASSET_CLASSES, type Asset, type AssetClass } from './types.js';
 
 const crypto = (symbol: string, name: string, sector: string, group = 'crypto-beta'): Asset => ({
@@ -8,15 +9,15 @@ const crypto = (symbol: string, name: string, sector: string, group = 'crypto-be
   class: 'crypto',
   sector,
   group,
-  feeds: { coinbase: `${symbol}-USD`, okx: `${symbol}-USDT-SWAP`, mock: symbol },
+  feeds: { coinbase: `${symbol}-USD`, okx: `${symbol}-USDT-SWAP`, news: `${symbol}-USD`, mock: symbol },
 });
-const listed = (symbol: string, name: string, cls: AssetClass, sector: string, group: string): Asset => ({
+const listed = (symbol: string, name: string, cls: AssetClass, sector: string, group: string, cik?: number): Asset => ({
   symbol,
   name,
   class: cls,
   sector,
   group,
-  feeds: { yahoo: symbol, mock: symbol },
+  feeds: { yahoo: symbol, news: symbol, ...(cik ? { sec: String(cik) } : {}), mock: symbol },
 });
 
 export const DEFAULT_ASSETS: readonly Asset[] = [
@@ -30,15 +31,15 @@ export const DEFAULT_ASSETS: readonly Asset[] = [
   listed('SPY', 'SPDR S&P 500 ETF', 'etf', 'Broad market', 'us-equity'),
   listed('QQQ', 'Invesco QQQ (Nasdaq 100)', 'etf', 'Broad market', 'us-tech'),
   listed('IWM', 'iShares Russell 2000', 'etf', 'Small caps', 'us-equity'),
-  listed('AAPL', 'Apple', 'equity', 'Technology', 'us-tech'),
-  listed('MSFT', 'Microsoft', 'equity', 'Technology', 'us-tech'),
-  listed('NVDA', 'NVIDIA', 'equity', 'Semiconductors', 'us-tech'),
-  listed('AMZN', 'Amazon', 'equity', 'Consumer', 'us-tech'),
-  listed('TSLA', 'Tesla', 'equity', 'Autos', 'us-tech'),
-  listed('JPM', 'JPMorgan Chase', 'equity', 'Financials', 'us-equity'),
-  listed('XOM', 'Exxon Mobil', 'equity', 'Energy', 'energy'),
-  listed('COIN', 'Coinbase', 'equity', 'Financials', 'crypto-beta'),
-  listed('MSTR', 'Strategy (MicroStrategy)', 'equity', 'Technology', 'crypto-beta'),
+  listed('AAPL', 'Apple', 'equity', 'Technology', 'us-tech', 320193),
+  listed('MSFT', 'Microsoft', 'equity', 'Technology', 'us-tech', 789019),
+  listed('NVDA', 'NVIDIA', 'equity', 'Semiconductors', 'us-tech', 1045810),
+  listed('AMZN', 'Amazon', 'equity', 'Consumer', 'us-tech', 1018724),
+  listed('TSLA', 'Tesla', 'equity', 'Autos', 'us-tech', 1318605),
+  listed('JPM', 'JPMorgan Chase', 'equity', 'Financials', 'us-equity', 19617),
+  listed('XOM', 'Exxon Mobil', 'equity', 'Energy', 'energy', 34088),
+  listed('COIN', 'Coinbase', 'equity', 'Financials', 'crypto-beta', 1679788),
+  listed('MSTR', 'Strategy (MicroStrategy)', 'equity', 'Technology', 'crypto-beta', 1050446),
   listed('TLT', 'iShares 20+ Year Treasury', 'rates', 'Treasuries', 'duration'),
   listed('GLD', 'SPDR Gold Shares', 'commodity', 'Gold', 'gold'),
   listed('USO', 'United States Oil Fund', 'commodity', 'Oil', 'energy'),

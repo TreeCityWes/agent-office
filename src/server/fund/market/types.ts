@@ -27,19 +27,39 @@ export interface SignalAdapter {
   everyMs: number;
   provides: SignalKind[];
   mock?: boolean;
+  /** Which of each asset's feeds it reads, when that isn't its own id (OKX's liquidations read the `okx` names). */
+  feed?: string;
+  /** About the market as a whole rather than an asset (the bitcoin network, US macro), so asked with no listings. */
+  global?: boolean;
   signals(listings: Listing[], signal: AbortSignal): Promise<Signal[]>;
 }
 
-/** A GET that gives JSON, or throws saying why, within `signal`'s time. */
-export async function getJson(url: string, signal: AbortSignal): Promise<unknown> {
-  const res = await fetch(url, { signal, headers: { 'user-agent': 'Mozilla/5.0 (agent-office fund)', accept: 'application/json' } });
+const UA = 'Mozilla/5.0 (agent-office fund)';
+
+async function get(url: string, signal: AbortSignal, accept: string, userAgent = UA): Promise<Response> {
+  const res = await fetch(url, { signal, headers: { 'user-agent': userAgent, accept } });
   if (!res.ok) throw new Error(`${new URL(url).host} answered ${res.status}`);
-  return res.json();
+  return res;
+}
+
+/** A GET that gives JSON, or throws saying why, within `signal`'s time. */
+export async function getJson(url: string, signal: AbortSignal, userAgent?: string): Promise<unknown> {
+  return (await get(url, signal, 'application/json', userAgent)).json();
+}
+
+/** A GET that gives text (CSV, RSS), or throws saying why, within `signal`'s time. */
+export async function getText(url: string, signal: AbortSignal): Promise<string> {
+  return (await get(url, signal, 'text/csv, application/rss+xml, text/xml, text/plain')).text();
 }
 
 /** Runs `each` on every listing at once, keeping what worked; throws the first error only when nothing did. */
-export async function eachListing<T>(listings: Listing[], each: (l: Listing) => Promise<T | undefined>): Promise<T[]> {
-  const settled = await Promise.allSettled(listings.map(each));
+export function eachListing<T>(listings: Listing[], each: (l: Listing) => Promise<T | undefined>): Promise<T[]> {
+  return allOk(listings.map(each));
+}
+
+/** What worked of several requests made at once; throws the first error only when nothing did. */
+export async function allOk<T>(tasks: Promise<T | undefined>[]): Promise<T[]> {
+  const settled = await Promise.allSettled(tasks);
   const out: T[] = [];
   let failed: unknown;
   for (const s of settled) {

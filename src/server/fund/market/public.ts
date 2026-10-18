@@ -1,5 +1,6 @@
 // The free public sources the fund starts with: Coinbase for crypto prices, Yahoo Finance for
-// listed prices, OKX for perpetual funding rates and open interest. None needs a key.
+// listed prices, OKX for perpetual funding rates and open interest. None needs a key. The rest of
+// the signals (liquidations, on-chain, news, macro, filings, sentiment) are in signals.ts.
 import type { Quote } from '../../../shared/fund/types.js';
 import type { Signal } from '../../../shared/fund/state.js';
 import { eachListing, getJson, n, type PriceAdapter, type SignalAdapter } from './types.js';

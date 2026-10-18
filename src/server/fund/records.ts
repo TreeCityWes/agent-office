@@ -4,6 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { applyCash, applyFill, emptyBook } from '../../shared/fund/book.js';
+import { positionEvent, type PositionEvent } from '../../shared/fund/positions.js';
 import { DEFAULT_LIMITS, checkLimits } from '../../shared/fund/risk.js';
 import { DEFAULT_CAPITAL, DEFAULT_CONFIG, checkConfig, type FundConfig, type LedgerEntry, type NavPoint } from '../../shared/fund/state.js';
 import type { ActivityEvent, ActivityKind, Actor, BookState, Fill, NavMarks, Proposal, RiskLimits } from '../../shared/fund/types.js';
@@ -25,6 +26,8 @@ export class Ledger implements Readback {
   config: FundConfig = DEFAULT_CONFIG;
   /** The latest fills, newest last. */
   fills: Fill[] = [];
+  /** What each of the latest fills did to its position, newest last. */
+  history: PositionEvent[] = [];
   problem?: string;
   repaired?: string;
   /** Whether anything has been written: false for a fund nobody has used yet. */
@@ -54,9 +57,11 @@ export class Ledger implements Readback {
     if (e.kind === 'cash') this.book = applyCash(this.book, e.amount);
     else if (e.kind === 'fill') {
       const { kind: _, ...fill } = e;
+      const before = this.book;
       this.book = applyFill(this.book, fill);
       this.fills.push(fill);
-      if (this.fills.length > 500) this.fills.splice(0, this.fills.length - 500);
+      this.history.push(positionEvent(before, this.book, fill));
+      for (const kept of [this.fills, this.history]) if (kept.length > 500) kept.splice(0, kept.length - 500);
     } else if (e.kind === 'limits') {
       // Checked again on the way in: a ledger from an older version keeps whatever is still valid.
       const r = checkLimits(e.limits);
