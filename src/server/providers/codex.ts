@@ -100,6 +100,9 @@ export const codex: ProviderAdapter<CodexState, CodexSetup> = {
     return { args, rotateToken: true };
   },
   bootHint: 'Open the terminal: complete login and review Office hooks in /hooks',
+  // On Windows a paste reaches Codex as keystrokes, and it takes an Enter within 120ms of the last
+  // as a newline (PASTE_ENTER_SUPPRESS_WINDOW in its tui/src/bottom_pane/paste_burst.rs).
+  screen: { enterOnShown: process.platform === 'win32' },
   hook: { strictJson: true, handle: codexHook },
   usage: {
     persisted: true,
