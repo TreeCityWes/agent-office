@@ -66,6 +66,19 @@ function tracker(s: CodexState): ToolTracker {
   };
 }
 
+const BOOT_HINT = 'Open the terminal: complete login and review Office hooks in /hooks';
+/** Codex's screens that need a human before it can be used: the office's hooks to review, the folder to trust, signing in. */
+const SETUP_SCREEN = /Hooks need review|Trust all and continue|Trust and continue|Sign in with ChatGPT|Sign in with Device Code|Use an OpenAI API key/;
+
+/**
+ * Codex runs its SessionStart hook with its first turn, so one resumed with no prompt says nothing
+ * until someone types, and is flagged as needing a human (bootHint). Its screen says which: it needs
+ * one while it shows a setup screen, and once it doesn't, it's at its prompt.
+ */
+export function codexBlocked(text: string, early: boolean): string | undefined {
+  return early && SETUP_SCREEN.test(text) ? BOOT_HINT : undefined;
+}
+
 /** Native Codex lifecycle hooks register the root rollout for bounded metric reads. */
 function codexHook(h: WorkerHandle<CodexState>, event: string, payload: unknown): boolean {
   const report = normalizeCodexHook(event, payload);
@@ -99,10 +112,10 @@ export const codex: ProviderAdapter<CodexState, CodexSetup> = {
     tracker(h.state).clear();
     return { args, rotateToken: true };
   },
-  bootHint: 'Open the terminal: complete login and review Office hooks in /hooks',
+  bootHint: BOOT_HINT,
   // On Windows a paste reaches Codex as keystrokes, and it takes an Enter within 120ms of the last
   // as a newline (PASTE_ENTER_SUPPRESS_WINDOW in its tui/src/bottom_pane/paste_burst.rs).
-  screen: { enterOnShown: process.platform === 'win32' },
+  screen: { enterOnShown: process.platform === 'win32', blocked: codexBlocked },
   hook: { strictJson: true, handle: codexHook },
   usage: {
     persisted: true,

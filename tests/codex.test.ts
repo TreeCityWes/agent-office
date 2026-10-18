@@ -13,7 +13,7 @@ import {
   validateCodexHook,
   writeCodexHook,
 } from '../src/server/codex.js';
-import { codex } from '../src/server/providers/codex.js';
+import { codex, codexBlocked } from '../src/server/providers/codex.js';
 
 test('normalizes bounded root Codex hook payloads and passes only the metric reader path', () => {
   assert.deepEqual(normalizeCodexHook('SessionStart', {
@@ -211,4 +211,17 @@ test('helper forwards only the bounded root event fields to the authenticated br
     await new Promise<void>((resolve) => server.close(() => resolve()));
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("a Codex that hasn't said it's up needs a human only while a setup screen shows", () => {
+  // As a Codex worker's screen showed them, on its first start and after being resumed.
+  const hooks = '  Hooks need review\n  7 hooks are new or changed.\n  Hooks can run outside the sandbox after you trust them.\n\n› 1. Review hooks\n  2. Trust all and continue\n  3. Continue without trusting (hooks won\'t run)';
+  const prompt = '  Worked for 6m 27s • 11:01 AM\n\n› Ask Codex to do anything\n\n  GPT-6-Astra xhigh · ~/office  ⚠ 2 warnings · f2 to view';
+  assert.match(codexBlocked(hooks, true) ?? '', /review Office hooks/);
+  assert.match(codexBlocked('  Sign in with ChatGPT\n  Sign in with Device Code\n  Provide your own API key', true) ?? '', /complete login/);
+  // Resumed with no prompt, it runs no hook until its first turn: at its prompt, it's ready.
+  assert.equal(codexBlocked(prompt, true), undefined);
+  // Once it has said it's up, its screen isn't read for this.
+  assert.equal(codexBlocked(hooks, false), undefined);
+  assert.equal(codex.screen?.blocked, codexBlocked);
 });
